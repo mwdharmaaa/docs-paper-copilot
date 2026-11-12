@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      background-color: #0c0c0e;
+      color: #f4f4f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      padding: 12px;
+      margin: 0;
+    }
+    .btn {
+      width: 100%;
+      background-color: #6366f1;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn:hover { background-color: #4f46e5; }
+    .btn-secondary {
+      background-color: #18181f;
+      border: 1px solid #27272a;
+      color: #a1a1aa;
+    }
+    textarea, select, input {
+      width: 100%;
+      background-color: #121216;
+      border: 1px solid #27272a;
+      color: #f4f4f5;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+      box-sizing: border-box;
+      font-size: 12px;
+    }
+    .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #71717a;
+      text-transform: uppercase;
+      margin-top: 10px;
+    }
+    #status {
+      font-size: 11px;
+      color: #a1a1aa;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="label">Pilih Aksi Perbaikan</div>
+  <select id="action">
+    <option value="puebi">PUEBI & Tata Bahasa Baku</option>
+    <option value="paraphrase">Parafrase Akademik</option>
+    <option value="plagiarism">Reduksi Plagiarisme</option>
+  </select>
+
+  <div class="label">API Key Gemini</div>
+  <input type="password" id="apiKey" placeholder="Masukkan Gemini API Key...">
+
+  <button class="btn" id="btnRun">Perbaiki Teks Seleksi</button>
+
+  <div class="label">Hasil Perbaikan</div>
+  <textarea id="result" rows="8" readonly placeholder="Hasil akan muncul di sini..."></textarea>
+
+  <button class="btn btn-secondary" id="btnReplace">Ganti Teks di Dokumen</button>
+
+  <div id="status">Siap.</div>
+
+  <script>
+    document.getElementById("btnRun").onclick = function() {
+      var act = document.getElementById("action").value;
+      var key = document.getElementById("apiKey").value;
+      var status = document.getElementById("status");
+      status.innerText = "Membaca teks dari dokumen...";
+
+      google.script.run
+        .withSuccessHandler(function(selectedText) {
+          if (!selectedText) {
+            status.innerText = "Silakan seleksi teks terlebih dahulu di dokumen.";
+            return;
+          }
+          status.innerText = "Memproses dengan AI...";
+          var prompt = "Tugas: Perbaiki teks akademik ini (" + act + "). Kembalikan hanya teks hasil perbaikan:\n\n" + selectedText;
+          google.script.run
+            .withSuccessHandler(function(output) {
+              document.getElementById("result").value = output;
+              status.innerText = "Perbaikan selesai.";
+            })
+            .withFailureHandler(function(err) {
+              status.innerText = "Error: " + err.message;
+            })
+            .callGemini(prompt, key, "gemini-2.5-flash");
+        })
+        .withFailureHandler(function(err) {
+          status.innerText = "Error seleksi: " + err.message;
+        })
+        .getActiveSelectionText();
+    };
+
+    document.getElementById("btnReplace").onclick = function() {
+      var text = document.getElementById("result").value;
+      if (!text) return;
+      var status = document.getElementById("status");
+      status.innerText = "Menerapkan ke dokumen...";
+      google.script.run
+        .withSuccessHandler(function() {
+          status.innerText = "Berhasil diganti di dokumen.";
+        })
+        .withFailureHandler(function(err) {
+          status.innerText = "Gagal mengganti: " + err.message;
+        })
+        .replaceActiveSelection(text);
+    };
+  </script>
+</body>
+</html>
