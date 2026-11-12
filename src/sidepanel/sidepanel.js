@@ -61,12 +61,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Sync Docs Selection
   btnSync.addEventListener("click", async () => {
     statusText.textContent = "Mengambil seleksi dari Google Docs...";
-    const sel = await ActionHandlers.fetchDocsSelection();
+    let sel = await ActionHandlers.fetchDocsSelection();
+    if (!sel) {
+      try {
+        const clipText = await navigator.clipboard.readText();
+        if (clipText && clipText.trim().length > 0) {
+          sel = clipText.trim();
+        }
+      } catch {}
+    }
     if (sel) {
       inputText.value = sel;
       statusText.textContent = `Berhasil mengambil ${sel.length} karakter.`;
     } else {
-      statusText.textContent = "Tidak ada teks yang diseleksi di dokumen.";
+      statusText.textContent = "Tidak ada teks terseleksi. Salin teks (Ctrl+C) di Docs lalu klik lagi.";
     }
   });
 
