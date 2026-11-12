@@ -50,24 +50,24 @@ export const ActionHandlers = {
     }
   },
 
-  async runAction(actionId, inputText, uiCallbacks) {
+  async runAction(actionId, inputText, customInstruction, uiCallbacks) {
     const { onStart, onSuccess, onError } = uiCallbacks;
-    const template = PromptTemplates[actionId];
+    const template = PromptTemplates[actionId] || PromptTemplates.custom;
 
-    if (!template) {
-      onError(new Error(`Action ${actionId} tidak dikenali.`));
+    if (!inputText || inputText.trim().length === 0) {
+      onError(new Error("Pilih teks di Google Docs atau ketik di kotak input teks."));
       return;
     }
 
-    if (!inputText || inputText.trim().length === 0) {
-      onError(new Error("Pilih teks di Google Docs atau ketik di kotak input."));
+    if (actionId === "custom" && (!customInstruction || customInstruction.trim().length === 0)) {
+      onError(new Error("Ketik instruksi prompt pada kotak instruksi interaktif."));
       return;
     }
 
     try {
       onStart();
       const settings = await StorageService.getSettings();
-      const prompt = template.buildPrompt(inputText.trim());
+      const prompt = template.buildPrompt(inputText.trim(), customInstruction);
       const revisedText = await AIClient.generate(settings, prompt);
 
       if (settings.autoCopyOnGenerate) {
