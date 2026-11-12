@@ -1,10 +1,11 @@
 /**
  * Docs Paper Copilot - Background Service Worker
- * Manages side panel behavior and cross-context messaging.
+ * Manages Gemini Docs orchestration and cross-context message routing.
  */
 
 import { StorageService } from "./src/core/storage_service.js";
 import { AIClient } from "./src/core/ai_client.js";
+import { PromptTemplates } from "./src/core/prompt_templates.js";
 
 chrome.runtime.onInstalled.addListener(() => {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
@@ -23,12 +24,10 @@ if (chrome.action && chrome.action.onClicked) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.type) {
-    return false;
-  }
+  if (!message || !message.type) return false;
 
   if (message.type === "PING") {
-    sendResponse({ status: "PONG", version: "1.0.0" });
+    sendResponse({ status: "PONG", version: "2.0.0" });
     return false;
   }
 
@@ -41,23 +40,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "EXECUTE_AGENT_PROMPT") {
+  if (message.type === "EXECUTE_AGENT_PROMPT" || message.type === "ASK_GEMINI") {
     (async () => {
       try {
         const { prompt, selectedContext } = message;
         const settings = await StorageService.getSettings();
-        const systemPrompt = `Kamu adalah AI Agent asisten penulisan dokumen di Google Docs.
-Tugas: Jalankan instruksi prompt pengguna langsung untuk konten halaman dokumen.
-Instruksi Pengguna: "${prompt}"
-${selectedContext ? `\nKonteks/Teks Seleksi Dokumen Saat Ini:\n"""\n${selectedContext}\n"""` : ""}
+        const fullPrompt = PromptTemplates.askGemini(prompt, selectedContext);
+        const text = await AIClient.generate(settings, fullPrompt);
+        sendResponse({ success: true, text });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
 
-Aturan:
-1. Hasilkan langsung teks konten dokumen yang diinginkan pengguna.
-2. JANGAN sertakan kalimat basa-basi seperti "Tentu", "Berikut adalah", atau catatan penutup. Teks ini akan langsung diketik ke dalam halaman dokumen Google Docs.
-3. Gunakan register bahasa dan format yang sesuai (e.g. jika diminta outline, berikan poin terstruktur; jika paragraf, berikan teks mengalir).`;
-
-        const generatedText = await AIClient.generate(settings, systemPrompt);
-        sendResponse({ success: true, text: generatedText });
+  if (message.type === "REFINE_TEXT") {
+    (async () => {
+      try {
+        const { text, refineType } = message;
+        const settings = await StorageService.getSettings();
+        const fullPrompt = PromptTemplates.refine(text, refineType);
+        const refined = await AIClient.generate(settings, fullPrompt);
+        sendResponse({ success: true, text: refined });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
