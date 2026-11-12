@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabContents = document.querySelectorAll(".tab-content");
   const actionCards = document.querySelectorAll(".action-card");
   const inputText = document.getElementById("input-text");
+  const customPromptInput = document.getElementById("custom-prompt-input");
+  const promptModeIndicator = document.getElementById("prompt-mode-indicator");
+  const quickChips = document.querySelectorAll(".quick-chip");
   const outputText = document.getElementById("output-text");
   const btnRun = document.getElementById("btn-run-process");
   const btnSync = document.getElementById("btn-sync-selection");
@@ -22,7 +25,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const diffBox = document.getElementById("diff-container");
   const statusText = document.getElementById("status-text");
 
-  // Tab Navigation
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));
@@ -33,12 +35,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Action Mode Selection
   actionCards.forEach((card) => {
     card.addEventListener("click", () => {
       actionCards.forEach((c) => c.classList.remove("active"));
       card.classList.add("active");
       activeAction = card.dataset.action;
+      promptModeIndicator.textContent = activeAction === "custom" ? "Instruksi Utama (Wajib)" : "Preset + Tambahan (Opsional)";
+      if (activeAction === "custom") customPromptInput.focus();
+    });
+  });
+
+  quickChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const val = chip.dataset.prompt;
+      customPromptInput.value = customPromptInput.value.trim() ? `${customPromptInput.value} dan ${val.toLowerCase()}` : val;
+      customPromptInput.focus();
+    });
+  });
+
+  // Shortcut Ctrl+Enter to execute
+  [inputText, customPromptInput].forEach((el) => {
+    el?.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        btnRun.click();
+      }
     });
   });
 
@@ -49,12 +70,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("setting-model").value = settings.model || "gemini-2.5-flash";
 
   document.getElementById("btn-save-settings").addEventListener("click", async () => {
-    const updated = {
+    await StorageService.saveSettings({
       provider: document.getElementById("setting-provider").value,
       apiKey: document.getElementById("setting-apikey").value.trim(),
       model: document.getElementById("setting-model").value.trim()
-    };
-    await StorageService.saveSettings(updated);
+    });
     statusText.textContent = "Pengaturan berhasil disimpan.";
   });
 
@@ -80,7 +100,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Run AI Process
   btnRun.addEventListener("click", () => {
-    ActionHandlers.runAction(activeAction, inputText.value, {
+    ActionHandlers.runAction(activeAction, inputText.value, customPromptInput.value, {
       onStart: () => {
         btnRun.disabled = true;
         statusText.textContent = "Memproses teks dengan AI...";
