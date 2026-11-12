@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const outputText = document.getElementById("output-text");
   const btnRun = document.getElementById("btn-run-process");
   const btnSync = document.getElementById("btn-sync-selection");
+  const btnType = document.getElementById("btn-type-docs");
   const btnApply = document.getElementById("btn-apply-docs");
   const btnCopy = document.getElementById("btn-copy-result");
   const diffBox = document.getElementById("diff-container");
@@ -119,20 +120,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Apply to Google Docs
-  btnApply.addEventListener("click", async () => {
-    const textToApply = outputText.value;
-    if (!textToApply) return;
-    statusText.textContent = "Menerapkan revisi ke Google Docs...";
-    const res = await ActionHandlers.applyToDocs(textToApply);
-    if (res?.success) {
-      statusText.textContent = res.pasted
-        ? "Berhasil ditimpa langsung ke Google Docs."
-        : "Tersalin ke clipboard. Tekan Ctrl+V di Docs.";
-    }
+  btnType?.addEventListener("click", async () => {
+    if (!outputText.value) return;
+    statusText.textContent = "Sedang ngetik otomatis ke halaman Docs...";
+    await ActionHandlers.autoTypeToDocs(outputText.value, 16);
+    statusText.textContent = "Pengetikan otomatis dimulai di dokumen.";
   });
 
-  // Copy Result
+  btnApply.addEventListener("click", async () => {
+    if (!outputText.value) return;
+    statusText.textContent = "Menerapkan revisi ke Google Docs...";
+    const res = await ActionHandlers.applyToDocs(outputText.value);
+    statusText.textContent = res?.pasted ? "Berhasil ditimpa langsung ke Docs." : "Tersalin ke clipboard. Tekan Ctrl+V di Docs.";
+  });
+
   btnCopy.addEventListener("click", async () => {
     if (!outputText.value) return;
     await navigator.clipboard.writeText(outputText.value);

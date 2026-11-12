@@ -50,6 +50,27 @@ export const ActionHandlers = {
     }
   },
 
+  async autoTypeToDocs(revisedText, speedMs = 16) {
+    if (!revisedText) {
+      throw new Error("Tidak ada teks perbaikan untuk diketik.");
+    }
+
+    const tab = await this.getActiveTab();
+    if (!tab || !tab.id) {
+      throw new Error("Tab Google Docs tidak ditemukan.");
+    }
+
+    try {
+      return await chrome.tabs.sendMessage(tab.id, {
+        action: "AUTO_TYPE_REVISION",
+        text: revisedText,
+        speedMs
+      });
+    } catch (err) {
+      return this.applyToDocs(revisedText);
+    }
+  },
+
   async runAction(actionId, inputText, customInstruction, uiCallbacks) {
     const { onStart, onSuccess, onError } = uiCallbacks;
     const template = PromptTemplates[actionId] || PromptTemplates.custom;
