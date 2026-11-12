@@ -46,6 +46,10 @@
           <div class="action-title">Format Sitasi</div>
           <div class="action-desc">Standardisasi APA 7th / IEEE references.</div>
         </button>
+        <button class="action-card" data-action="custom" style="grid-column: span 2;">
+          <div class="action-title">Prompt Bebas (Interaktif)</div>
+          <div class="action-desc">Ketik instruksi atau prompt kustom spesifik sesuai kebutuhanmu.</div>
+        </button>
       </div>
 
       <div style="margin-top: 14px;">
@@ -53,7 +57,21 @@
           <span class="section-label" style="margin-bottom: 0;">Teks Input</span>
           <button id="btn-sync-selection" class="secondary-btn" style="padding: 3px 8px; font-size: 11px;">Ambil Seleksi Docs</button>
         </div>
-        <textarea id="input-text" rows="5" placeholder="Pilih teks di Google Docs atau ketik di sini..."></textarea>
+        <textarea id="input-text" rows="4" placeholder="Pilih teks di Google Docs atau ketik di sini..."></textarea>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span class="section-label" style="margin-bottom: 0;">Instruksi Prompt Interaktif</span>
+          <span id="prompt-mode-indicator" style="font-size: 11px; color: var(--accent-primary);">Preset + Tambahan</span>
+        </div>
+        <textarea id="custom-prompt-input" rows="2" placeholder="Ketik instruksi prompt khusus di sini (atau klik salah satu chip cepat di bawah)..."></textarea>
+        <div class="quick-chip-container">
+          <button type="button" class="quick-chip" data-prompt="Persingkat dan pertajam kalimat inti">Persingkat</button>
+          <button type="button" class="quick-chip" data-prompt="Perjelas hubungan sebab-akibat antarargumen">Perjelas Logika</button>
+          <button type="button" class="quick-chip" data-prompt="Gunakan terminologi akademik yang lebih formal">Lebih Formal</button>
+          <button type="button" class="quick-chip" data-prompt="Ubah kalimat aktif menjadi kalimat pasif objektif">Pasif Objektif</button>
+        </div>
       </div>
 
       <div style="margin-top: 12px;">

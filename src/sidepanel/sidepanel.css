@@ -215,3 +215,33 @@ textarea:focus, input:focus, select:focus {
   align-items: center;
   justify-content: space-between;
 }
+
+.quick-chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.quick-chip {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-chip:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: #383844;
+}
+
+.quick-chip.active {
+  background-color: #1e1b4b;
+  border-color: var(--accent-primary);
+  color: #c7d2fe;
+}
