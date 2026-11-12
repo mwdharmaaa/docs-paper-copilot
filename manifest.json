@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Docs Paper Copilot - AI Academic Assistant",
-  "version": "1.0.0",
-  "description": "AI-powered academic proofreading, PUEBI correction, and paraphrasing assistant for Google Docs.",
+  "name": "Ask Gemini for Google Docs - Auto-Type AI",
+  "version": "2.0.0",
+  "description": "Ask Gemini side panel and in-document assistant for Google Docs with autonomous real-time typing into your document.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -26,7 +26,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Docs Paper Copilot",
+    "default_title": "Ask Gemini for Google Docs",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

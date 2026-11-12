@@ -22,6 +22,7 @@ $requiredFiles = @(
     "src/sidepanel/sidepanel.html",
     "src/sidepanel/sidepanel.css",
     "src/sidepanel/sidepanel.js",
+    "src/sidepanel/gemini_card.js",
     "src/sidepanel/diff_viewer.js",
     "src/sidepanel/action_handlers.js",
     "apps-script/Code.js",

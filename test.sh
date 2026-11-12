@@ -22,6 +22,7 @@ test -f src/core/ai_client.js || { echo "[x] Missing ai_client.js"; exit 1; }
 test -f src/sidepanel/sidepanel.html || { echo "[x] Missing sidepanel.html"; exit 1; }
 test -f src/sidepanel/sidepanel.css || { echo "[x] Missing sidepanel.css"; exit 1; }
 test -f src/sidepanel/sidepanel.js || { echo "[x] Missing sidepanel.js"; exit 1; }
+test -f src/sidepanel/gemini_card.js || { echo "[x] Missing gemini_card.js"; exit 1; }
 test -f src/sidepanel/diff_viewer.js || { echo "[x] Missing diff_viewer.js"; exit 1; }
 test -f src/sidepanel/action_handlers.js || { echo "[x] Missing action_handlers.js"; exit 1; }
 
