@@ -1,132 +1,131 @@
 /**
- * Docs Paper Copilot - In-Page Agent Design System
- * Figma/Linear neutral dark palette, zero emojis, refined typography.
+ * Ask Gemini for Google Docs - In-Page "Help Me Write" Styles
+ * Google Workspace Material dark aesthetic, zero emojis, refined sparkle branding.
  */
 
-#docs-paper-agent-root {
+#docs-gemini-agent-root {
   position: fixed;
   bottom: 24px;
   right: 28px;
   z-index: 2147483647;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #f4f4f5;
+  color: #e3e3e3;
   font-size: 13px;
   user-select: none;
 }
 
-.dpc-floating-pill {
+.gemini-floating-pill {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #121216;
-  border: 1px solid #27272a;
+  background-color: #1e1f20;
+  border: 1px solid #333538;
   padding: 8px 14px;
   border-radius: 9999px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   cursor: pointer;
   transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.dpc-floating-pill:hover {
-  background-color: #18181f;
-  border-color: #4f46e5;
+.gemini-floating-pill:hover {
+  background-color: #282a2c;
+  border-color: #8ab4f8;
   transform: translateY(-2px);
 }
 
-.dpc-pill-icon {
-  width: 16px;
-  height: 16px;
-  color: #6366f1;
+.gemini-pill-sparkle {
+  width: 18px;
+  height: 18px;
+  color: #a8c7fa;
+  flex-shrink: 0;
 }
 
-.dpc-pill-title {
-  font-weight: 600;
+.gemini-pill-title {
+  font-weight: 500;
   font-size: 12px;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
 }
 
-.dpc-pill-shortcut {
-  background-color: #1e1b4b;
-  color: #c7d2fe;
+.gemini-pill-shortcut {
+  background-color: #2b2d30;
+  color: #c4c7c5;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid #3730a3;
+  border: 1px solid #3c4043;
   font-family: monospace;
 }
 
-.dpc-agent-modal {
+.gemini-inpage-modal {
   position: fixed;
   bottom: 76px;
   right: 28px;
   width: 440px;
-  background-color: #0c0c0e;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-  padding: 14px;
+  background-color: #1e1f20;
+  border: 1px solid #333538;
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.dpc-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #1f1f23;
-  padding-bottom: 8px;
-}
-
-.dpc-header-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f4f4f5;
-}
-
-.dpc-btn-close {
-  background: transparent;
-  border: none;
-  color: #71717a;
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
-  line-height: 1;
-}
-.dpc-btn-close:hover { color: #f4f4f5; }
-
-.dpc-prompt-input {
-  width: 100%;
-  background-color: #121216;
-  border: 1px solid #27272a;
-  color: #f4f4f5;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 12px;
-  resize: vertical;
-  min-height: 60px;
-  outline: none;
+  gap: 12px;
   box-sizing: border-box;
 }
 
-.dpc-prompt-input:focus {
-  border-color: #4f46e5;
+.gemini-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.dpc-chips-row {
+.gemini-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e3e3e3;
+}
+
+.gemini-btn-close {
+  background: transparent;
+  border: none;
+  color: #8e918f;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.gemini-btn-close:hover { color: #e3e3e3; }
+
+.gemini-inpage-input {
+  width: 100%;
+  background-color: #131314;
+  border: 1px solid #333538;
+  color: #e3e3e3;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 64px;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.4;
+}
+
+.gemini-inpage-input:focus {
+  border-color: #8ab4f8;
+}
+
+.gemini-chips-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.dpc-chip {
-  background-color: #18181f;
-  border: 1px solid #27272a;
-  color: #a1a1aa;
+.gemini-chip {
+  background-color: #282a2c;
+  border: 1px solid #333538;
+  color: #c4c7c5;
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -134,27 +133,26 @@
   transition: all 0.15s ease;
 }
 
-.dpc-chip:hover {
-  background-color: #27272a;
-  color: #f4f4f5;
-  border-color: #3f3f46;
+.gemini-chip:hover {
+  background-color: #333538;
+  color: #e3e3e3;
+  border-color: #8ab4f8;
 }
 
-.dpc-action-bar {
+.gemini-inpage-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 2px;
 }
 
-.dpc-btn-primary {
+.gemini-btn-primary {
   flex: 1;
-  background-color: #6366f1;
+  background-color: #1a73e8;
   color: #ffffff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
+  border-radius: 8px;
+  padding: 9px 14px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -165,32 +163,32 @@
   transition: background-color 0.15s ease;
 }
 
-.dpc-btn-primary:hover { background-color: #4f46e5; }
-.dpc-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.gemini-btn-primary:hover { background-color: #1b66c9; }
+.gemini-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.dpc-btn-stop {
+.gemini-btn-stop {
   background-color: #7f1d1d;
   color: #fecaca;
   border: 1px solid #991b1b;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 8px;
+  padding: 9px 12px;
   font-size: 12px;
   cursor: pointer;
 }
-.dpc-btn-stop:hover { background-color: #991b1b; }
+.gemini-btn-stop:hover { background-color: #991b1b; }
 
-.dpc-status-tag {
+.gemini-status-tag {
   font-size: 11px;
-  color: #71717a;
+  color: #8e918f;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.dpc-typing-indicator {
+.gemini-pulse-dot {
   width: 6px;
   height: 6px;
-  background-color: #22c55e;
+  background-color: #8ab4f8;
   border-radius: 50%;
-  box-shadow: 0 0 8px #22c55e;
+  box-shadow: 0 0 8px #8ab4f8;
 }
