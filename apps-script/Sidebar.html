@@ -59,7 +59,11 @@
     <option value="puebi">PUEBI & Tata Bahasa Baku</option>
     <option value="paraphrase">Parafrase Akademik</option>
     <option value="plagiarism">Reduksi Plagiarisme</option>
+    <option value="custom">Prompt Bebas (Interaktif)</option>
   </select>
+
+  <div class="label">Instruksi Prompt Interaktif</div>
+  <textarea id="customPrompt" rows="2" placeholder="Ketik instruksi prompt khusus (misal: persingkat, perjelas logika)..."></textarea>
 
   <div class="label">API Key Gemini</div>
   <input type="password" id="apiKey" placeholder="Masukkan Gemini API Key...">
@@ -77,6 +81,7 @@
     document.getElementById("btnRun").onclick = function() {
       var act = document.getElementById("action").value;
       var key = document.getElementById("apiKey").value;
+      var customPrompt = document.getElementById("customPrompt").value.trim();
       var status = document.getElementById("status");
       status.innerText = "Membaca teks dari dokumen...";
 
@@ -87,7 +92,8 @@
             return;
           }
           status.innerText = "Memproses dengan AI...";
-          var prompt = "Tugas: Perbaiki teks akademik ini (" + act + "). Kembalikan hanya teks hasil perbaikan:\n\n" + selectedText;
+          var extra = customPrompt ? "\nInstruksi khusus: " + customPrompt : "";
+          var prompt = "Tugas: Perbaiki teks akademik ini (" + act + ")." + extra + "\nKembalikan HANYA teks hasil perbaikan:\n\n" + selectedText;
           google.script.run
             .withSuccessHandler(function(output) {
               document.getElementById("result").value = output;
