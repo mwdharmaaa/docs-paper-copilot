@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Docs Paper Copilot - AI Academic Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered academic proofreading, PUEBI correction, and paraphrasing assistant for Google Docs.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "storage",
+    "scripting",
+    "clipboardRead",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://docs.google.com/document/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.openai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://docs.google.com/document/*"
+      ],
+      "js": [
+        "src/content/docs_observer.js",
+        "src/content/docs_bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

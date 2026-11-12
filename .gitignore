@@ -1,0 +1,14 @@
+# Environment & Local storage
+.env
+*.local
+node_modules/
+dist/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary profiles
+/tmp/
+chrome-dev-profile/
