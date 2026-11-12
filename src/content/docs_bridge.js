@@ -86,6 +86,28 @@
       return true;
     }
 
+    if (request.action === "AUTO_TYPE_REVISION") {
+      const { text, speedMs } = request;
+      if (!text) {
+        sendResponse({ success: false, error: "Empty text payload" });
+        return false;
+      }
+
+      if (window.AutoTyper) {
+        window.AutoTyper.typeStream(text, {
+          speedMs: speedMs || 16,
+          onComplete: () => {
+            showDocsNotification("Selesai ngetik otomatis ke dokumen.");
+          }
+        });
+        sendResponse({ success: true, started: true });
+      } else {
+        simulatePaste(text);
+        sendResponse({ success: true, fallback: "paste" });
+      }
+      return true;
+    }
+
     return false;
   });
 })();
