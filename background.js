@@ -11,6 +11,14 @@ chrome.runtime.onInstalled.addListener(() => {
   }
 });
 
+if (chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener(async (tab) => {
+    if (tab && tab.id && chrome.sidePanel && chrome.sidePanel.open) {
+      await chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+    }
+  });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) {
     return false;
