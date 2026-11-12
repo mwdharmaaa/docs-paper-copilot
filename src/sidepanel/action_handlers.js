@@ -1,12 +1,7 @@
 /**
  * Docs Paper Copilot - Action Handlers
- * Coordinates communication between UI, active tab, and AI engine.
+ * Bridges Side Panel UI with Chrome background worker and active Docs tab.
  */
-
-import { StorageService } from "../core/storage_service.js";
-import { PromptTemplates } from "../core/prompt_templates.js";
-import { AIClient } from "../core/ai_client.js";
-import { DiffViewer } from "./diff_viewer.js";
 
 export const ActionHandlers = {
   async getActiveTab() {
@@ -14,90 +9,88 @@ export const ActionHandlers = {
     return tab || null;
   },
 
+  async fetchDocInfo() {
+    const tab = await this.getActiveTab();
+    if (!tab?.id) return { title: "Google Docs", hasSelection: false };
+    try {
+      return await chrome.tabs.sendMessage(tab.id, { action: "GET_DOC_INFO" });
+    } catch {
+      return { title: tab.title?.replace(" - Google Docs", "") || "Google Docs", hasSelection: false };
+    }
+  },
+
   async fetchDocsSelection() {
     const tab = await this.getActiveTab();
-    if (!tab || !tab.id) {
-      throw new Error("Tidak menemukan tab Google Docs yang aktif.");
-    }
-
+    if (!tab?.id) return "";
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, { action: "GET_SELECTED_TEXT" });
-      return response?.text || "";
+      const res = await chrome.tabs.sendMessage(tab.id, { action: "GET_SELECTED_TEXT" });
+      return res?.text || "";
     } catch {
       return "";
     }
   },
 
-  async applyToDocs(revisedText) {
-    if (!revisedText) {
-      throw new Error("Tidak ada teks perbaikan untuk dimasukkan.");
-    }
-
+  async autoTypeToDocs(text, speedMs = 16) {
+    if (!text) throw new Error("Tidak ada konten untuk diketik.");
     const tab = await this.getActiveTab();
-    if (!tab || !tab.id) {
-      throw new Error("Tab Google Docs tidak ditemukan.");
-    }
+    if (!tab?.id) throw new Error("Tab Google Docs tidak ditemukan.");
+
+    return chrome.tabs.sendMessage(tab.id, {
+      action: "AUTO_TYPE_REVISION",
+      text,
+      speedMs
+    });
+  },
+
+  async insertToDocs(text) {
+    if (!text) throw new Error("Tidak ada konten untuk dimasukkan.");
+    const tab = await this.getActiveTab();
+    if (!tab?.id) throw new Error("Tab Google Docs tidak ditemukan.");
 
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, {
+      return await chrome.tabs.sendMessage(tab.id, {
         action: "APPLY_REVISION",
-        text: revisedText
+        text
       });
-      return response;
-    } catch (err) {
-      await navigator.clipboard.writeText(revisedText);
+    } catch {
+      await navigator.clipboard.writeText(text);
       return { success: true, pasted: false, fallbackCopied: true };
     }
   },
 
-  async autoTypeToDocs(revisedText, speedMs = 16) {
-    if (!revisedText) {
-      throw new Error("Tidak ada teks perbaikan untuk diketik.");
-    }
-
-    const tab = await this.getActiveTab();
-    if (!tab || !tab.id) {
-      throw new Error("Tab Google Docs tidak ditemukan.");
-    }
-
-    try {
-      return await chrome.tabs.sendMessage(tab.id, {
-        action: "AUTO_TYPE_REVISION",
-        text: revisedText,
-        speedMs
+  async askGemini(prompt, selectedContext = "") {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: "ASK_GEMINI",
+        prompt,
+        selectedContext
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!res?.success) {
+          reject(new Error(res?.error || "Gagal memproses prompt Gemini."));
+        } else {
+          resolve(res.text);
+        }
       });
-    } catch (err) {
-      return this.applyToDocs(revisedText);
-    }
+    });
   },
 
-  async runAction(actionId, inputText, customInstruction, uiCallbacks) {
-    const { onStart, onSuccess, onError } = uiCallbacks;
-    const template = PromptTemplates[actionId] || PromptTemplates.custom;
-
-    if (!inputText || inputText.trim().length === 0) {
-      onError(new Error("Pilih teks di Google Docs atau ketik di kotak input teks."));
-      return;
-    }
-
-    if (actionId === "custom" && (!customInstruction || customInstruction.trim().length === 0)) {
-      onError(new Error("Ketik instruksi prompt pada kotak instruksi interaktif."));
-      return;
-    }
-
-    try {
-      onStart();
-      const settings = await StorageService.getSettings();
-      const prompt = template.buildPrompt(inputText.trim(), customInstruction);
-      const revisedText = await AIClient.generate(settings, prompt);
-
-      if (settings.autoCopyOnGenerate) {
-        await navigator.clipboard.writeText(revisedText).catch(() => {});
-      }
-
-      onSuccess({ original: inputText.trim(), revised: revisedText });
-    } catch (err) {
-      onError(err);
-    }
+  async refineText(text, refineType) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        type: "REFINE_TEXT",
+        text,
+        refineType
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!res?.success) {
+          reject(new Error(res?.error || "Gagal memproses penyempurnaan teks."));
+        } else {
+          resolve(res.text);
+        }
+      });
+    });
   }
 };

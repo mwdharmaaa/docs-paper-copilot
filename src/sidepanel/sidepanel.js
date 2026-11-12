@@ -1,142 +1,112 @@
 /**
- * Docs Paper Copilot - Side Panel Entry Controller
+ * Ask Gemini for Google Docs - Side Panel Controller
+ * Handles conversation flow, document selection context, and auto-typing dispatch.
  */
 
 import { StorageService } from "../core/storage_service.js";
 import { ActionHandlers } from "./action_handlers.js";
-import { DiffViewer } from "./diff_viewer.js";
-
-let activeAction = "puebi";
-let lastRevision = { original: "", revised: "" };
+import { renderGeminiCard } from "./gemini_card.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const tabs = document.querySelectorAll(".tab-btn");
-  const tabContents = document.querySelectorAll(".tab-content");
-  const actionCards = document.querySelectorAll(".action-card");
-  const inputText = document.getElementById("input-text");
-  const customPromptInput = document.getElementById("custom-prompt-input");
-  const promptModeIndicator = document.getElementById("prompt-mode-indicator");
-  const quickChips = document.querySelectorAll(".quick-chip");
-  const outputText = document.getElementById("output-text");
-  const btnRun = document.getElementById("btn-run-process");
-  const btnSync = document.getElementById("btn-sync-selection");
-  const btnType = document.getElementById("btn-type-docs");
-  const btnApply = document.getElementById("btn-apply-docs");
-  const btnCopy = document.getElementById("btn-copy-result");
-  const diffBox = document.getElementById("diff-container");
-  const statusText = document.getElementById("status-text");
+  const promptInput = document.getElementById("prompt-input");
+  const sendBtn = document.getElementById("btn-send-prompt");
+  const messagesList = document.getElementById("messages-list");
+  const welcomeCard = document.getElementById("welcome-card");
+  const footerStatus = document.getElementById("footer-status");
+  const clearChatBtn = document.getElementById("btn-clear-chat");
+  const selectionBar = document.getElementById("selection-bar");
+  const selectionPreview = document.getElementById("selection-preview");
+  const clearSelectionBtn = document.getElementById("btn-clear-selection");
+  const settingsDrawer = document.getElementById("settings-drawer");
+  const openSettingsBtn = document.getElementById("btn-open-settings");
+  const closeSettingsBtn = document.getElementById("btn-close-settings");
+  const saveSettingsBtn = document.getElementById("btn-save-settings");
+  const docTitleLabel = document.getElementById("doc-title-label");
 
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tabContents.forEach((c) => (c.style.display = "none"));
-      tab.classList.add("active");
-      const target = document.getElementById(tab.dataset.tab);
-      if (target) target.style.display = "block";
-    });
-  });
-
-  actionCards.forEach((card) => {
-    card.addEventListener("click", () => {
-      actionCards.forEach((c) => c.classList.remove("active"));
-      card.classList.add("active");
-      activeAction = card.dataset.action;
-      promptModeIndicator.textContent = activeAction === "custom" ? "Instruksi Utama (Wajib)" : "Preset + Tambahan (Opsional)";
-      if (activeAction === "custom") customPromptInput.focus();
-    });
-  });
-
-  quickChips.forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const val = chip.dataset.prompt;
-      customPromptInput.value = customPromptInput.value.trim() ? `${customPromptInput.value} dan ${val.toLowerCase()}` : val;
-      customPromptInput.focus();
-    });
-  });
-
-  // Shortcut Ctrl+Enter to execute
-  [inputText, customPromptInput].forEach((el) => {
-    el?.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        e.preventDefault();
-        btnRun.click();
-      }
-    });
-  });
+  let currentSelectionContext = "";
 
   // Load Settings
   const settings = await StorageService.getSettings();
-  document.getElementById("setting-provider").value = settings.provider || "gemini";
   document.getElementById("setting-apikey").value = settings.apiKey || "";
   document.getElementById("setting-model").value = settings.model || "gemini-2.5-flash";
+  document.getElementById("setting-speed").value = settings.speed || "20";
 
-  document.getElementById("btn-save-settings").addEventListener("click", async () => {
+  openSettingsBtn.onclick = () => settingsDrawer.style.display = "flex";
+  closeSettingsBtn.onclick = () => settingsDrawer.style.display = "none";
+  saveSettingsBtn.onclick = async () => {
     await StorageService.saveSettings({
-      provider: document.getElementById("setting-provider").value,
       apiKey: document.getElementById("setting-apikey").value.trim(),
-      model: document.getElementById("setting-model").value.trim()
+      model: document.getElementById("setting-model").value,
+      speed: document.getElementById("setting-speed").value
     });
-    statusText.textContent = "Pengaturan berhasil disimpan.";
-  });
+    settingsDrawer.style.display = "none";
+    footerStatus.textContent = "Pengaturan tersimpan.";
+  };
 
-  // Sync Docs Selection
-  btnSync.addEventListener("click", async () => {
-    statusText.textContent = "Mengambil seleksi dari Google Docs...";
-    let sel = await ActionHandlers.fetchDocsSelection();
-    if (!sel) {
-      try {
-        const clipText = await navigator.clipboard.readText();
-        if (clipText && clipText.trim().length > 0) {
-          sel = clipText.trim();
-        }
-      } catch {}
+  // Sync Doc Info & Selection
+  async function refreshDocState() {
+    const info = await ActionHandlers.fetchDocInfo();
+    if (info?.title) docTitleLabel.textContent = info.title;
+    const sel = await ActionHandlers.fetchDocsSelection();
+    if (sel && sel.trim().length > 0) {
+      currentSelectionContext = sel.trim();
+      selectionPreview.textContent = `"${currentSelectionContext.slice(0, 35)}..."`;
+      selectionBar.style.display = "flex";
     }
-    if (sel) {
-      inputText.value = sel;
-      statusText.textContent = `Berhasil mengambil ${sel.length} karakter.`;
-    } else {
-      statusText.textContent = "Tidak ada teks terseleksi. Salin teks (Ctrl+C) di Docs lalu klik lagi.";
+  }
+  refreshDocState();
+
+  clearSelectionBtn.onclick = () => {
+    currentSelectionContext = "";
+    selectionBar.style.display = "none";
+  };
+
+  // Submit Prompt to Gemini
+  async function submitPrompt(promptText) {
+    if (!promptText || promptText.trim().length === 0) return;
+    welcomeCard.style.display = "none";
+
+    const userMsg = document.createElement("div");
+    userMsg.className = "user-msg";
+    userMsg.textContent = promptText;
+    messagesList.appendChild(userMsg);
+    userMsg.scrollIntoView({ behavior: "smooth" });
+
+    promptInput.value = "";
+    footerStatus.textContent = "Gemini sedang memproses...";
+    sendBtn.disabled = true;
+
+    try {
+      const responseText = await ActionHandlers.askGemini(promptText, currentSelectionContext);
+      const speed = parseInt(document.getElementById("setting-speed").value, 10) || 20;
+      const card = renderGeminiCard(responseText, speed, (status) => {
+        footerStatus.textContent = status;
+      });
+      messagesList.appendChild(card);
+      card.scrollIntoView({ behavior: "smooth" });
+      footerStatus.textContent = "Siap untuk instruksi berikutnya.";
+    } catch (err) {
+      footerStatus.textContent = `Error: ${err.message}`;
+    } finally {
+      sendBtn.disabled = false;
     }
+  }
+
+  // Events
+  sendBtn.onclick = () => submitPrompt(promptInput.value);
+  promptInput.onkeydown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitPrompt(promptInput.value);
+    }
+  };
+
+  document.querySelectorAll(".suggestion-chip").forEach((chip) => {
+    chip.onclick = () => submitPrompt(chip.dataset.prompt);
   });
 
-  // Run AI Process
-  btnRun.addEventListener("click", () => {
-    ActionHandlers.runAction(activeAction, inputText.value, customPromptInput.value, {
-      onStart: () => {
-        btnRun.disabled = true;
-        statusText.textContent = "Memproses teks dengan AI...";
-      },
-      onSuccess: ({ original, revised }) => {
-        btnRun.disabled = false;
-        outputText.value = revised;
-        lastRevision = { original, revised };
-        DiffViewer.renderToElement(diffBox, original, revised);
-        statusText.textContent = "Perbaikan selesai. Siap diterapkan.";
-      },
-      onError: (err) => {
-        btnRun.disabled = false;
-        statusText.textContent = `Error: ${err.message}`;
-      }
-    });
-  });
-
-  btnType?.addEventListener("click", async () => {
-    if (!outputText.value) return;
-    statusText.textContent = "Sedang ngetik otomatis ke halaman Docs...";
-    await ActionHandlers.autoTypeToDocs(outputText.value, 16);
-    statusText.textContent = "Pengetikan otomatis dimulai di dokumen.";
-  });
-
-  btnApply.addEventListener("click", async () => {
-    if (!outputText.value) return;
-    statusText.textContent = "Menerapkan revisi ke Google Docs...";
-    const res = await ActionHandlers.applyToDocs(outputText.value);
-    statusText.textContent = res?.pasted ? "Berhasil ditimpa langsung ke Docs." : "Tersalin ke clipboard. Tekan Ctrl+V di Docs.";
-  });
-
-  btnCopy.addEventListener("click", async () => {
-    if (!outputText.value) return;
-    await navigator.clipboard.writeText(outputText.value);
-    statusText.textContent = "Hasil revisi berhasil disalin ke clipboard.";
-  });
+  clearChatBtn.onclick = () => {
+    messagesList.innerHTML = "";
+    welcomeCard.style.display = "flex";
+  };
 });

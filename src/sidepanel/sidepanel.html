@@ -3,133 +3,109 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Docs Paper Copilot</title>
+  <title>Ask Gemini - Google Docs</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-        <polyline points="14 2 14 8 20 8"></polyline>
-        <line x1="16" y1="13" x2="8" y2="13"></line>
-        <line x1="16" y1="17" x2="8" y2="17"></line>
-        <polyline points="10 9 9 9 8 9"></polyline>
+  <!-- Header -->
+  <header class="gemini-header">
+    <div class="brand-group">
+      <svg class="gemini-sparkle-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
       </svg>
-      <span>Paper Copilot</span>
+      <div>
+        <div class="brand-title">Gemini</div>
+        <div class="brand-sub">Google Docs Assistant</div>
+      </div>
     </div>
-    <nav class="nav-tabs">
-      <button class="tab-btn active" data-tab="tab-editor">Editor</button>
-      <button class="tab-btn" data-tab="tab-diff">Diff</button>
-      <button class="tab-btn" data-tab="tab-settings">Pengaturan</button>
-    </nav>
+    <div class="header-actions">
+      <button id="btn-toggle-context" class="context-pill" title="Status konteks dokumen">
+        <span class="context-dot"></span>
+        <span id="doc-title-label">Dokumen Terhubung</span>
+      </button>
+      <button id="btn-open-settings" class="icon-btn" title="Pengaturan API">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
   </header>
 
-  <main>
-    <!-- TAB 1: EDITOR -->
-    <div id="tab-editor" class="tab-content">
-      <div class="section-label">Mode Penyempurnaan</div>
-      <div class="action-grid">
-        <button class="action-card active" data-action="puebi">
-          <div class="action-title">PUEBI & Ejaan</div>
-          <div class="action-desc">Koreksi typo, tanda baca, kapitalisasi baku.</div>
-        </button>
-        <button class="action-card" data-action="paraphrase">
-          <div class="action-title">Parafrase Ilmiah</div>
-          <div class="action-desc">Tingkatkan register akademik dan kalimat pasif.</div>
-        </button>
-        <button class="action-card" data-action="plagiarism">
-          <div class="action-title">Reduksi Plagiasi</div>
-          <div class="action-desc">Ubah struktur klausa tanpa ubah substansi.</div>
-        </button>
-        <button class="action-card" data-action="citation">
-          <div class="action-title">Format Sitasi</div>
-          <div class="action-desc">Standardisasi APA 7th / IEEE references.</div>
-        </button>
-        <button class="action-card" data-action="custom" style="grid-column: span 2;">
-          <div class="action-title">Prompt Bebas (Interaktif)</div>
-          <div class="action-desc">Ketik instruksi atau prompt kustom spesifik sesuai kebutuhanmu.</div>
-        </button>
+  <!-- Settings Panel (Collapsible) -->
+  <section id="settings-drawer" class="settings-drawer" style="display: none;">
+    <div class="settings-header">
+      <span>Pengaturan Model & Kunci API</span>
+      <button id="btn-close-settings" class="close-btn">&times;</button>
+    </div>
+    <div class="settings-field">
+      <label>Google Gemini API Key</label>
+      <input type="password" id="setting-apikey" placeholder="Masukkan Gemini API Key...">
+    </div>
+    <div class="settings-row">
+      <div class="settings-field" style="flex: 1;">
+        <label>Model</label>
+        <select id="setting-model">
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cepat)</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Maksimal)</option>
+        </select>
       </div>
-
-      <div style="margin-top: 14px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span class="section-label" style="margin-bottom: 0;">Teks Input</span>
-          <button id="btn-sync-selection" class="secondary-btn" style="padding: 3px 8px; font-size: 11px;">Ambil Seleksi Docs</button>
-        </div>
-        <textarea id="input-text" rows="4" placeholder="Pilih teks di Google Docs atau ketik di sini..."></textarea>
+      <div class="settings-field" style="flex: 1;">
+        <label>Kecepatan Ngetik</label>
+        <select id="setting-speed">
+          <option value="12">Super Cepat (12ms)</option>
+          <option value="20" selected>Alami (20ms)</option>
+          <option value="35">Santai (35ms)</option>
+        </select>
       </div>
+    </div>
+    <button id="btn-save-settings" class="save-btn">Simpan Pengaturan</button>
+  </section>
 
-      <div style="margin-top: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span class="section-label" style="margin-bottom: 0;">Instruksi Prompt Interaktif</span>
-          <span id="prompt-mode-indicator" style="font-size: 11px; color: var(--accent-primary);">Preset + Tambahan</span>
-        </div>
-        <textarea id="custom-prompt-input" rows="2" placeholder="Ketik instruksi prompt khusus di sini (atau klik salah satu chip cepat di bawah)..."></textarea>
-        <div class="quick-chip-container">
-          <button type="button" class="quick-chip" data-prompt="Persingkat dan pertajam kalimat inti">Persingkat</button>
-          <button type="button" class="quick-chip" data-prompt="Perjelas hubungan sebab-akibat antarargumen">Perjelas Logika</button>
-          <button type="button" class="quick-chip" data-prompt="Gunakan terminologi akademik yang lebih formal">Lebih Formal</button>
-          <button type="button" class="quick-chip" data-prompt="Ubah kalimat aktif menjadi kalimat pasif objektif">Pasif Objektif</button>
-        </div>
+  <!-- Chat / Interaction Feed -->
+  <main id="chat-feed" class="chat-feed">
+    <!-- Welcome Hero Card (Shown on Empty State) -->
+    <div id="welcome-card" class="welcome-card">
+      <div class="welcome-icon-box">
+        <svg class="welcome-sparkle" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+        </svg>
       </div>
+      <h2>Apa yang ingin kamu tulis hari ini?</h2>
+      <p>Tanya apa saja tentang dokumen ini, buat draf tulisan baru, atau minta Gemini mengetik otomatis langsung ke Google Docs.</p>
 
-      <div style="margin-top: 12px;">
-        <button id="btn-run-process" class="primary-btn">
-          <span>Jalankan Perbaikan AI</span>
-        </button>
-      </div>
-
-      <div style="margin-top: 14px;">
-        <div class="section-label">Hasil Revisi</div>
-        <textarea id="output-text" rows="5" readonly placeholder="Hasil revisi teks akan muncul di sini..."></textarea>
-        <div style="display: flex; gap: 6px; margin-top: 8px;">
-          <button id="btn-type-docs" class="primary-btn" style="flex: 2; background-color: #4f46e5;">Ngetik Otomatis</button>
-          <button id="btn-apply-docs" class="secondary-btn" style="flex: 1;">Paste Instan</button>
-          <button id="btn-copy-result" class="secondary-btn" style="padding: 8px 10px;">Salin</button>
-        </div>
+      <div class="suggestions-grid">
+        <button class="suggestion-chip" data-prompt="Bantu tulis paragraf pembuka tentang dampak AI">Bantu tulis draf pembuka</button>
+        <button class="suggestion-chip" data-prompt="Ringkas poin-poin utama dari isi dokumen ini">Ringkas dokumen</button>
+        <button class="suggestion-chip" data-prompt="Perbaiki ejaan, typo, dan tata bahasa teks seleksi sesuai PUEBI">Perbaiki ejaan & PUEBI</button>
+        <button class="suggestion-chip" data-prompt="Kembangkan argumen ini menjadi analisis mendalam">Kembangkan argumen</button>
       </div>
     </div>
 
-    <!-- TAB 2: DIFF -->
-    <div id="tab-diff" class="tab-content" style="display: none;">
-      <div class="section-label">Perbandingan Teks (Sebelum vs Sesudah)</div>
-      <div id="diff-container" class="diff-box">Belum ada revisi yang diproses. Jalankan perbaikan di tab Editor.</div>
-      <div style="margin-top: 10px; font-size: 11px; color: var(--text-muted); display: flex; gap: 12px;">
-        <span><span class="diff-tag diff-added">+ Hijau</span> : Penambahan kata</span>
-        <span><span class="diff-tag diff-removed">- Merah</span> : Pengurangan/koreksi kata</span>
-      </div>
-    </div>
-
-    <!-- TAB 3: SETTINGS -->
-    <div id="tab-settings" class="tab-content" style="display: none;">
-      <div class="section-label">Konfigurasi Model AI</div>
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <div>
-          <label class="section-label">Provider AI</label>
-          <select id="setting-provider">
-            <option value="gemini">Google Gemini (Disarankan)</option>
-            <option value="openai">OpenAI</option>
-          </select>
-        </div>
-        <div>
-          <label class="section-label">API Key</label>
-          <input type="password" id="setting-apikey" placeholder="Masukkan API Key...">
-        </div>
-        <div>
-          <label class="section-label">Model Engine</label>
-          <input type="text" id="setting-model" value="gemini-2.5-flash" placeholder="e.g. gemini-2.5-flash, gemini-2.5-pro">
-        </div>
-        <div>
-          <button id="btn-save-settings" class="primary-btn" style="margin-top: 6px;">Simpan Pengaturan</button>
-        </div>
-      </div>
-    </div>
+    <!-- Messages Container -->
+    <div id="messages-list" class="messages-list"></div>
   </main>
 
-  <footer class="status-bar">
-    <span id="status-text">Siap melayani koreksi dokumen.</span>
-    <span id="doc-sync-status">Docs terhubung</span>
+  <!-- Bottom Input Bar -->
+  <footer class="input-container">
+    <div id="selection-bar" class="selection-pill-bar" style="display: none;">
+      <span class="selection-badge">Konteks Seleksi Terdeteksi</span>
+      <span id="selection-preview" class="selection-preview-text"></span>
+      <button id="btn-clear-selection" class="selection-clear" title="Hapus konteks seleksi">&times;</button>
+    </div>
+
+    <div class="prompt-box">
+      <textarea id="prompt-input" rows="1" placeholder="Tanya Gemini atau instruksikan menulis..."></textarea>
+      <button id="btn-send-prompt" class="send-btn" title="Kirim instruksi">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-footer">
+      <span id="footer-status">Tekan Enter untuk kirim, Shift+Enter untuk baris baru.</span>
+      <button id="btn-clear-chat" class="text-link-btn">Bersihkan Chat</button>
+    </div>
   </footer>
 
   <script type="module" src="sidepanel.js"></script>
