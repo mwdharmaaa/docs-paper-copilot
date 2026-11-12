@@ -22,7 +22,8 @@
     "https://api.openai.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_title": "Docs Paper Copilot",
@@ -40,9 +41,14 @@
       "matches": [
         "https://docs.google.com/document/*"
       ],
+      "css": [
+        "src/content/in_page_agent.css"
+      ],
       "js": [
+        "src/content/auto_typer.js",
         "src/content/docs_observer.js",
-        "src/content/docs_bridge.js"
+        "src/content/docs_bridge.js",
+        "src/content/in_page_agent.js"
       ],
       "run_at": "document_idle"
     }
