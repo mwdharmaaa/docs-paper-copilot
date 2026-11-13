@@ -72,9 +72,9 @@ function replaceActiveSelection(newText) {
 function callGemini(promptText, apiKey, modelName) {
   var key = apiKey || PropertiesService.getUserProperties().getProperty("GEMINI_API_KEY");
   if (!key) throw new Error("API Key belum disetel.");
-  var model = modelName || "gemini-3.8-flash";
-  if (!model || model.indexOf("gemini-2.5") !== -1 || model.indexOf("gemini-2.0") !== -1) {
-    model = (model && model.indexOf("pro") !== -1) ? "gemini-3.8-pro" : "gemini-3.8-flash";
+  var model = modelName || "gemini-3.5-flash-lite";
+  if (!model || model.indexOf("gemini-2.5") !== -1 || model.indexOf("gemini-2.0") !== -1 || model === "gemini-3.8-flash") {
+    model = (model && model.indexOf("pro") !== -1) ? "gemini-3.8-pro" : "gemini-3.5-flash-lite";
   }
 
   var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key;

@@ -102,7 +102,7 @@
             .withFailureHandler(function(err) {
               status.innerText = "Error: " + err.message;
             })
-            .callGemini(prompt, key, "gemini-3.8-flash");
+            .callGemini(prompt, key, "gemini-3.5-flash-lite");
         })
         .withFailureHandler(function(err) {
           status.innerText = "Error seleksi: " + err.message;

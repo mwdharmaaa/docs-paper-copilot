@@ -6,15 +6,15 @@
 const DEFAULT_SETTINGS = {
   provider: "gemini",
   apiKey: "",
-  model: "gemini-3.8-flash",
+  model: "gemini-3.5-flash-lite",
   academicStyle: "formal-id",
   temperature: 0.2,
   autoCopyOnGenerate: true
 };
 
 function normalizeModel(model) {
-  if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
-    return model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.8-flash";
+  if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5") || model === "gemini-3.8-flash") {
+    return model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash-lite";
   }
   return model;
 }
