@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Load Settings
   const settings = await StorageService.getSettings();
   document.getElementById("setting-apikey").value = settings.apiKey || "";
-  document.getElementById("setting-model").value = settings.model || "gemini-2.5-flash";
+  document.getElementById("setting-model").value = settings.model || "gemini-3.8-flash";
   document.getElementById("setting-speed").value = settings.speed || "20";
 
   openSettingsBtn.onclick = () => settingsDrawer.style.display = "flex";

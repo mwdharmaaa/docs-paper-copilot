@@ -6,25 +6,40 @@
 const DEFAULT_SETTINGS = {
   provider: "gemini",
   apiKey: "",
-  model: "gemini-2.5-flash",
+  model: "gemini-3.8-flash",
   academicStyle: "formal-id",
   temperature: 0.2,
   autoCopyOnGenerate: true
 };
+
+function normalizeModel(model) {
+  if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
+    return model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.8-flash";
+  }
+  return model;
+}
 
 export const StorageService = {
   async getSettings() {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => {
         chrome.storage.local.get(DEFAULT_SETTINGS, (items) => {
-          resolve({ ...DEFAULT_SETTINGS, ...items });
+          const merged = { ...DEFAULT_SETTINGS, ...items };
+          const normalized = normalizeModel(merged.model);
+          if (normalized !== merged.model) {
+            merged.model = normalized;
+            chrome.storage.local.set({ model: normalized });
+          }
+          resolve(merged);
         });
       });
     }
 
     try {
       const stored = localStorage.getItem("docs_copilot_settings");
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+      const current = stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+      current.model = normalizeModel(current.model);
+      return current;
     } catch {
       return DEFAULT_SETTINGS;
     }

@@ -9,7 +9,11 @@ export const AIClient = {
       throw new Error("API Key belum diisi. Masukkan Gemini API Key di tab Pengaturan.");
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const activeModel = (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5"))
+      ? (model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.8-flash")
+      : model;
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -79,12 +83,15 @@ export const AIClient = {
   },
 
   async generate(settings, prompt) {
-    const { provider = "gemini", apiKey, model = "gemini-2.5-flash", temperature } = settings;
+    let { provider = "gemini", apiKey, model = "gemini-3.8-flash", temperature } = settings;
 
-    if (provider === "openai") {
-      return this.executeOpenAI({ apiKey, model, prompt, temperature });
+    if (provider === "gemini") {
+      if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
+        model = model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.8-flash";
+      }
+      return this.executeGemini({ apiKey, model, prompt, temperature });
     }
 
-    return this.executeGemini({ apiKey, model, prompt, temperature });
+    return this.executeOpenAI({ apiKey, model, prompt, temperature });
   }
 };
