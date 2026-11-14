@@ -82,12 +82,16 @@
         return false;
       }
 
-      navigator.clipboard.writeText(text).then(() => {
+      const cleanText = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
+        ? window.AutoTyper.cleanMarkdownForDocs(text)
+        : text;
+
+      navigator.clipboard.writeText(cleanText).then(() => {
         let injected = false;
         if (window.AutoTyper && typeof window.AutoTyper.instantInsert === "function") {
-          injected = window.AutoTyper.instantInsert(text);
+          injected = window.AutoTyper.instantInsert(cleanText);
         } else {
-          injected = simulatePaste(text);
+          injected = simulatePaste(cleanText);
         }
 
         if (injected) {
@@ -113,17 +117,20 @@
 
       if (window.AutoTyper) {
         window.AutoTyper.typeStream(text, {
-          speedMs: speedMs || 12,
+          speedMs: speedMs || 0,
           onComplete: () => {
-            showDocsNotification("Selesai ngetik otomatis ke dokumen.");
+            showDocsNotification("Selesai memasukkan teks ke dokumen.");
           },
           onError: (err) => {
-            showDocsNotification(err || "Gagal ngetik ke dokumen.", false);
+            showDocsNotification(err || "Gagal memasukkan ke dokumen.", false);
           }
         });
         sendResponse({ success: true, started: true });
       } else {
-        const injected = simulatePaste(text);
+        const cleanText = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
+          ? window.AutoTyper.cleanMarkdownForDocs(text)
+          : text;
+        const injected = simulatePaste(cleanText);
         sendResponse({ success: true, fallback: "paste", pasted: injected });
       }
       return true;

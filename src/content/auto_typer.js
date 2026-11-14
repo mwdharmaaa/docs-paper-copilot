@@ -58,6 +58,79 @@
       }
     },
 
+    cleanMarkdownForDocs(text) {
+      if (!text || typeof text !== "string") return "";
+
+      let s = text;
+
+      // 1. Remove markdown code block markers
+      s = s.replace(/^```[a-zA-Z]*\r?\n/gm, "");
+      s = s.replace(/\r?\n```$/gm, "");
+      s = s.replace(/```/g, "");
+
+      // 2. Remove horizontal rules (---, ***, ___)
+      s = s.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, "");
+
+      // 3. Remove markdown headers (# Title, ## Subtitle, etc.)
+      s = s.replace(/^[ \t]*#{1,6}\s*/gm, "");
+
+      // 4. Standardize bullet points: replace '* item' with '- item'
+      s = s.replace(/^[ \t]*\*[ \t]+/gm, "- ");
+
+      // 5. Clean parenthesized asterisk terms: (*Cyprinus carpio*) -> (Cyprinus carpio)
+      s = s.replace(/\(\*+([^*]+)\*+\)/g, "($1)");
+
+      // 6. Strip bold/italic asterisks: ***text*** -> text, **text** -> text, *text* -> text
+      s = s.replace(/\*{3}([^*]+)\*{3}/g, "$1");
+      s = s.replace(/\*{2}([^*]+)\*{2}/g, "$1");
+      s = s.replace(/\*([^*\r\n]+)\*/g, "$1");
+
+      // 7. Strip any remaining stray asterisks
+      s = s.replace(/\*/g, "");
+
+      // 8. Strip markdown backticks
+      s = s.replace(/`/g, "");
+
+      // 9. Normalize multiple consecutive blank lines to max 2 newlines
+      s = s.replace(/(\r?\n){3,}/g, "\n\n");
+
+      return s.trim();
+    },
+
+    ensureNormalFont() {
+      try {
+        const iframe = this.getEditorIframe();
+
+        // 1. Check iframe document queryCommandState
+        if (iframe && iframe.contentDocument) {
+          try {
+            if (iframe.contentDocument.queryCommandState && iframe.contentDocument.queryCommandState("bold")) {
+              iframe.contentDocument.execCommand("bold", false, null);
+            }
+          } catch (e) {
+            console.warn("[AutoTyper] queryCommandState bold check:", e);
+          }
+        }
+
+        // 2. Check Google Docs toolbar bold button
+        const boldBtn = document.getElementById("boldButton") ||
+                        document.querySelector(".docs-material-button[id*='bold']") ||
+                        document.querySelector("[aria-label*='Tebal']") ||
+                        document.querySelector("[aria-label*='Bold']");
+        if (boldBtn) {
+          const isPressed = boldBtn.getAttribute("aria-pressed") === "true" ||
+                            boldBtn.getAttribute("aria-checked") === "true" ||
+                            boldBtn.classList.contains("goog-toolbar-button-checked") ||
+                            boldBtn.classList.contains("docs-material-button-checked");
+          if (isPressed) {
+            boldBtn.click();
+          }
+        }
+      } catch (err) {
+        console.warn("[AutoTyper] ensureNormalFont error:", err);
+      }
+    },
+
     insertChar(ch) {
       const iframe = this.getEditorIframe();
       const target = this.getEditorTarget();
@@ -206,24 +279,78 @@
       return true;
     },
 
+    instantInsert(rawText, options = {}) {
+      const { onProgress, onComplete, onError } = options;
+      if (!rawText || rawText.length === 0) {
+        if (onComplete) onComplete();
+        return true;
+      }
+
+      this.isTyping = true;
+      this.abortRequested = false;
+
+      // Blur parent window active elements (e.g. prompt textarea / button)
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+
+      this.focusEditor();
+      this.ensureNormalFont();
+
+      const target = this.getEditorTarget();
+      if (!target) {
+        this.isTyping = false;
+        if (onError) onError("Target editor Google Docs tidak ditemukan.");
+        return false;
+      }
+
+      const text = this.cleanMarkdownForDocs(rawText);
+      const chars = Array.from(text);
+      const total = chars.length;
+
+      for (let i = 0; i < total; i++) {
+        if (this.abortRequested) {
+          this.isTyping = false;
+          this.abortRequested = false;
+          return false;
+        }
+
+        this.insertChar(chars[i]);
+
+        if (onProgress && (i % 25 === 0 || i === total - 1)) {
+          onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
+        }
+      }
+
+      this.isTyping = false;
+      if (onComplete) onComplete();
+      return true;
+    },
+
     async typeStream(text, options = {}) {
-      const { speedMs = 8, onProgress, onComplete, onCancel, onError } = options;
+      const { speedMs = 0, onProgress, onComplete, onCancel, onError } = options;
 
       if (!text || text.length === 0) {
         if (onComplete) onComplete();
         return;
       }
 
+      // If speedMs is 0 or unassigned, execute instant insertion directly
+      if (!speedMs || speedMs <= 0) {
+        this.instantInsert(text, { onProgress, onComplete, onError });
+        return;
+      }
+
       this.isTyping = true;
       this.abortRequested = false;
 
-      // Ensure active element in parent document (such as popup prompt input) is blurred
       if (document.activeElement && typeof document.activeElement.blur === "function") {
         document.activeElement.blur();
       }
 
       this.focusEditor();
-      await new Promise((res) => setTimeout(res, 50));
+      this.ensureNormalFont();
+      await new Promise((res) => setTimeout(res, 30));
       this.focusEditor();
 
       const target = this.getEditorTarget();
@@ -233,7 +360,8 @@
         return;
       }
 
-      const chars = Array.from(text);
+      const cleanText = this.cleanMarkdownForDocs(text);
+      const chars = Array.from(cleanText);
       const total = chars.length;
 
       for (let i = 0; i < total; i++) {
@@ -251,7 +379,7 @@
           onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
         }
 
-        const delay = (ch === "\n" || ch === " ") ? Math.max(3, speedMs / 2) : speedMs;
+        const delay = (ch === "\n" || ch === " ") ? Math.max(2, speedMs / 2) : speedMs;
         if (delay > 0) {
           await new Promise((res) => setTimeout(res, delay));
         }
@@ -259,19 +387,6 @@
 
       this.isTyping = false;
       if (onComplete) onComplete();
-    },
-
-    instantInsert(text) {
-      if (!text) return false;
-      this.focusEditor();
-      const target = this.getEditorTarget();
-      if (!target) return false;
-
-      const chars = Array.from(text);
-      for (const ch of chars) {
-        this.insertChar(ch);
-      }
-      return true;
     },
 
     stop() {

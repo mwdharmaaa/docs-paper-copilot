@@ -151,30 +151,26 @@
           return;
         }
 
-        statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Sedang ngetik otomatis ke Docs...';
+        statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Sedang menulis langsung ke Docs...';
 
         if (window.AutoTyper) {
-          window.AutoTyper.typeStream(res.text, {
-            speedMs: 8,
-            onProgress: (p) => {
-              statusEl.textContent = `Ngetik ke dokumen: ${p.percent}%`;
-            },
-            onComplete: () => {
-              statusEl.textContent = "Selesai ngetik ke halaman.";
-              runBtn.disabled = false;
-              stopBtn.style.display = "none";
-            },
-            onError: (err) => {
-              statusEl.textContent = `Error: ${err}`;
-              runBtn.disabled = false;
-              stopBtn.style.display = "none";
-            },
-            onCancel: () => {
-              statusEl.textContent = "Pengetikan dibatalkan.";
-              runBtn.disabled = false;
-              stopBtn.style.display = "none";
-            }
-          });
+          setTimeout(() => {
+            window.AutoTyper.instantInsert(res.text, {
+              onProgress: (p) => {
+                statusEl.textContent = `Menulis ke dokumen: ${p.percent}%`;
+              },
+              onComplete: () => {
+                statusEl.textContent = "Selesai menulis ke halaman.";
+                runBtn.disabled = false;
+                stopBtn.style.display = "none";
+              },
+              onError: (err) => {
+                statusEl.textContent = `Error: ${err}`;
+                runBtn.disabled = false;
+                stopBtn.style.display = "none";
+              }
+            });
+          }, 35);
         } else {
           statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
           runBtn.disabled = false;
