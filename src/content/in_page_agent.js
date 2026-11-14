@@ -155,7 +155,7 @@
 
         if (window.AutoTyper) {
           window.AutoTyper.typeStream(res.text, {
-            speedMs: 12,
+            speedMs: 8,
             onProgress: (p) => {
               statusEl.textContent = `Ngetik ke dokumen: ${p.percent}%`;
             },
