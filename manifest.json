@@ -46,6 +46,7 @@
       ],
       "js": [
         "src/content/auto_typer.js",
+        "src/content/page_learner.js",
         "src/content/docs_observer.js",
         "src/content/docs_bridge.js",
         "src/content/in_page_agent.js"

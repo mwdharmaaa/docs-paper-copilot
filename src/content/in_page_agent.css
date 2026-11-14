@@ -78,6 +78,95 @@
   justify-content: space-between;
 }
 
+/* Page Learner Card in In-Page Modal */
+.gemini-page-profile-card {
+  background-color: #161718;
+  border: 1px solid #2f3337;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gemini-page-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gemini-page-profile-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a8c7fa;
+}
+
+.gemini-brain-icon {
+  width: 13px;
+  height: 13px;
+  color: #a8c7fa;
+  flex-shrink: 0;
+}
+
+.gemini-btn-relearn {
+  background: transparent;
+  border: 1px solid #3c4043;
+  color: #9aa0a6;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gemini-btn-relearn:hover {
+  background-color: #2b2d30;
+  color: #e3e3e3;
+  border-color: #8ab4f8;
+}
+
+.gemini-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.gemini-profile-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.gemini-profile-tag.font-tag {
+  background-color: rgba(138, 180, 248, 0.12);
+  color: #8ab4f8;
+  border: 1px solid rgba(138, 180, 248, 0.25);
+}
+
+.gemini-profile-tag.spacing-tag {
+  background-color: rgba(197, 138, 249, 0.12);
+  color: #c58af9;
+  border: 1px solid rgba(197, 138, 249, 0.25);
+}
+
+.gemini-profile-tag.align-tag {
+  background-color: rgba(52, 168, 83, 0.12);
+  color: #81c995;
+  border: 1px solid rgba(52, 168, 83, 0.25);
+}
+
+.gemini-profile-tag.tone-tag {
+  background-color: rgba(251, 188, 4, 0.12);
+  color: #fdd663;
+  border: 1px solid rgba(251, 188, 4, 0.25);
+}
+
 .gemini-header-title {
   display: flex;
   align-items: center;

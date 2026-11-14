@@ -24,9 +24,27 @@
           <svg class="gemini-pill-sparkle" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
           </svg>
-          <span>Ask Gemini - Bantu Saya Menulis</span>
+          <span>GTyipe - Bantu Saya Menulis</span>
         </div>
         <button id="gemini-close-btn" class="gemini-btn-close">&times;</button>
+      </div>
+
+      <div id="gemini-page-profile-card" class="gemini-page-profile-card">
+        <div class="gemini-page-profile-header">
+          <div class="gemini-page-profile-title">
+            <svg class="gemini-brain-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+            </svg>
+            <span>Format Halaman Dipelajari</span>
+          </div>
+          <button type="button" id="gemini-btn-relearn" class="gemini-btn-relearn" title="Pelajari ulang format halaman">Pelajari Ulang</button>
+        </div>
+        <div id="gemini-profile-tags" class="gemini-profile-tags">
+          <span class="gemini-profile-tag font-tag" id="tag-font">Memindai font...</span>
+          <span class="gemini-profile-tag spacing-tag" id="tag-spacing">Spasi...</span>
+          <span class="gemini-profile-tag align-tag" id="tag-align">Perataan...</span>
+          <span class="gemini-profile-tag tone-tag" id="tag-tone">Gaya...</span>
+        </div>
       </div>
 
       <textarea id="gemini-prompt" class="gemini-inpage-input" placeholder="Tulis draf tentang..., lanjutkan tulisan ini, atau perbaiki gaya bahasa..."></textarea>
@@ -58,11 +76,52 @@
   const stopBtn = document.getElementById("gemini-stop-btn");
   const statusEl = document.getElementById("gemini-status");
   const chips = document.querySelectorAll(".gemini-chip");
+  const tagFont = document.getElementById("tag-font");
+  const tagSpacing = document.getElementById("tag-spacing");
+  const tagAlign = document.getElementById("tag-align");
+  const tagTone = document.getElementById("tag-tone");
+  const relearnBtn = document.getElementById("gemini-btn-relearn");
+
+  let activePageProfile = null;
+
+  function updateLearnedPageProfile(forceRefresh = false) {
+    if (window.PageLearner) {
+      activePageProfile = forceRefresh ? window.PageLearner.learnPage() : window.PageLearner.getProfile();
+      if (activePageProfile) {
+        if (tagFont) {
+          tagFont.textContent = `${activePageProfile.fontFamily} ${activePageProfile.fontSize}`;
+          tagFont.title = `Font: ${activePageProfile.fontFamily} (${activePageProfile.fontSize})`;
+        }
+        if (tagSpacing) {
+          tagSpacing.textContent = `Spasi ${activePageProfile.lineSpacing.split(" ")[0]}`;
+          tagSpacing.title = `Jarak Baris: ${activePageProfile.lineSpacing}`;
+        }
+        if (tagAlign) {
+          tagAlign.textContent = activePageProfile.alignment.includes("Justify") ? "Justify" : "Rata Kiri";
+          tagAlign.title = `Perataan: ${activePageProfile.alignment}`;
+        }
+        if (tagTone) {
+          tagTone.textContent = activePageProfile.genreTag || "Dokumen Formal";
+          tagTone.title = `Gaya: ${activePageProfile.writingStyle}\nMargin: ${activePageProfile.margins}`;
+        }
+      }
+    }
+  }
+
+  if (relearnBtn) {
+    relearnBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      updateLearnedPageProfile(true);
+      statusEl.textContent = "Format halaman berhasil dipelajari ulang.";
+    };
+  }
 
   function toggleModal(show) {
     const isVisible = show !== undefined ? show : modal.style.display === "none";
     modal.style.display = isVisible ? "flex" : "none";
     if (isVisible) {
+      updateLearnedPageProfile(false);
       setTimeout(() => promptInput.focus(), 50);
     }
   }
@@ -125,6 +184,9 @@
     runBtn.blur();
 
     const selected = getSelectedDocText();
+    const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
+
+    statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Menulis draf sesuai format (${profile?.fontFamily || 'TNR'}, ${profile?.genreTag || 'Formal'})...`;
 
     try {
       if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id || typeof chrome.runtime.sendMessage !== "function") {
@@ -137,7 +199,8 @@
       chrome.runtime.sendMessage({
         type: "ASK_GEMINI",
         prompt: promptText,
-        selectedContext: selected
+        selectedContext: selected,
+        pageProfile: profile
       }, (res) => {
         if (chrome.runtime.lastError || !res?.success) {
           const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";

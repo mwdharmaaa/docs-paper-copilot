@@ -40,11 +40,25 @@
     if (!request || !request.action) return false;
 
     if (request.action === "GET_DOC_INFO") {
+      const pageProfile = window.PageLearner ? window.PageLearner.getProfile() : null;
       sendResponse({
         id: getDocId(),
         title: getDocTitle(),
         url: window.location.href,
-        hasSelection: Boolean(getSelectedTextFallback())
+        hasSelection: Boolean(getSelectedTextFallback()),
+        pageProfile
+      });
+      return false;
+    }
+
+    if (request.action === "GET_PAGE_PROFILE" || request.action === "LEARN_PAGE_FORMAT") {
+      const forceRefresh = Boolean(request.forceRefresh);
+      const profile = window.PageLearner
+        ? (forceRefresh ? window.PageLearner.learnPage() : window.PageLearner.getProfile())
+        : null;
+      sendResponse({
+        success: true,
+        pageProfile: profile
       });
       return false;
     }

@@ -4,16 +4,53 @@
  */
 
 export const PromptTemplates = {
-  askGemini(userPrompt, docContext = "") {
+  askGemini(userPrompt, docContext = "", pageProfile = null) {
     const contextSection = docContext && docContext.trim()
       ? `\nKonteks Dokumen / Teks Seleksi Dokumen:\n"""\n${docContext.trim()}\n"""\n`
       : "";
 
-    return `Kamu adalah Gemini di Google Docs, asisten AI cerdas untuk penulisan, penyuntingan, dan analisis dokumen.
-Tugas: Tanggapi permintaan pengguna berikut secara berkualitas tinggi, presisi, dan alami.
+    let pageLearningSection = "";
+    if (pageProfile && typeof pageProfile === "object") {
+      const {
+        fontFamily = "Times New Roman",
+        fontSize = "12pt",
+        alignment = "Justify (Rata Kanan-Kiri)",
+        lineSpacing = "1.5 spasi",
+        margins = "Standar Normal (2.54 cm)",
+        pageSize = "A4",
+        indentStyle = "Blok Paragraf",
+        writingStyle = "Karya Ilmiah / Skripsi Formal",
+        headingPattern = "Format BAB Romawi & Subbab Desimal (1.1, 1.2)",
+        genreTag = "Dokumen Formal",
+        sampleExcerpt = ""
+      } = pageProfile;
+
+      pageLearningSection = `
+=== HASIL PEMBELAJARAN FORMAT & GAYA HALAMAN DOKUMEN PENGGUNA ===
+AI telah memeriksa dan mempelajari halaman aktif Google Docs milik pengguna:
+- Tipografi Huruf: ${fontFamily} (${fontSize})
+- Format Tata Letak & Spasi: ${alignment}, ${lineSpacing}
+- Margin Halaman & Kertas: ${margins}, Ukuran ${pageSize}
+- Gaya Paragraf/Alinea: ${indentStyle}
+- Gaya Bahasa & Register Dokumen: ${writingStyle} (Kategori: ${genreTag})
+- Konvensi Judul & Penomoran: ${headingPattern}
+${sampleExcerpt ? `- Cuplikan Teks yang Dipelajari dari Dokumen:\n"""\n${sampleExcerpt.slice(0, 500)}...\n"""\n` : ""}
+PEDOMAN ADAPTASI KONTEN BERDASARKAN HASIL BELAJAR (MUTLAK DIPATUHI):
+1. Anda HARUS menghasilkan konten berdasarkan "Instruksi Pengguna" di bawah ini, tetapi NADA BAHASA, STRUKTUR PARAGRAF, DAN TATA LETAK HARUS BERADAPTASI SECARA SEMPURNA dengan profil halaman dokumen yang telah dipelajari di atas.
+2. Jika profil dokumen adalah Karya Ilmiah / Skripsi:
+   - Gunakan bahasa Indonesia baku tingkat tinggi (PUEBI/KBBI) dengan gaya objektif ilmiah.
+   - Gunakan kalimat pasif formal (e.g. "Penelitian ini mengkaji...", "Berdasarkan analisis tersebut..."). Dilarang menggunakan kata ganti informal ("aku", "kamu").
+   - Kembangkan ide paragraf secara terstruktur, komprehensif, dan mendalam.
+3. Jika profil dokumen memiliki konvensi penomoran (seperti 1.1, 1.2 atau A. B.), lanjutkan pola penomoran tersebut secara konsisten.
+4. Sesuaikan pemisahan alinea agar selaras dengan ${indentStyle}.
+`;
+    }
+
+    return `Kamu adalah GTyipe di Google Docs, asisten AI cerdas untuk penulisan, penyuntingan, dan pembuatan konten dokumen adaptif.
+Tugas: Pelajari profil dokumen di bawah dan tanggapi instruksi pengguna secara berkualitas tinggi, presisi, dan selaras dengan format halaman.
 
 Instruksi Pengguna: "${userPrompt.trim()}"
-${contextSection}
+${contextSection}${pageLearningSection}
 Aturan Format Penulisan Google Docs (SANGAT PENTING):
 1. Jika pengguna meminta untuk menulis, membuat draf, melanjutkan, memperbaiki, atau menyusun konten: Hasilkan LANGSUNG teks dokumen yang siap dimasukkan/diketik ke halaman Google Docs tanpa kalimat pengantar (e.g. "Tentu, ini drafnya:"), tanpa penutup, dan tanpa tanda kutip pembungkus.
 2. DILARANG KERAS MENGGUNAKAN SIMBOL MARKDOWN:

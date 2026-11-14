@@ -12,6 +12,7 @@ $requiredFiles = @(
     "icons/icon48.png",
     "icons/icon128.png",
     "src/content/auto_typer.js",
+    "src/content/page_learner.js",
     "src/content/in_page_agent.css",
     "src/content/in_page_agent.js",
     "src/content/docs_observer.js",

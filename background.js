@@ -43,9 +43,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "EXECUTE_AGENT_PROMPT" || message.type === "ASK_GEMINI") {
     (async () => {
       try {
-        const { prompt, selectedContext } = message;
+        const { prompt, selectedContext, pageProfile } = message;
         const settings = await StorageService.getSettings();
-        const fullPrompt = PromptTemplates.askGemini(prompt, selectedContext);
+        const fullPrompt = PromptTemplates.askGemini(prompt, selectedContext, pageProfile);
         const text = await AIClient.generate(settings, fullPrompt);
         sendResponse({ success: true, text });
       } catch (err) {

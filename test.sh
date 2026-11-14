@@ -12,6 +12,7 @@ test -f icons/icon16.png || { echo "[x] Missing icon16.png"; exit 1; }
 test -f icons/icon48.png || { echo "[x] Missing icon48.png"; exit 1; }
 test -f icons/icon128.png || { echo "[x] Missing icon128.png"; exit 1; }
 test -f src/content/auto_typer.js || { echo "[x] Missing auto_typer.js"; exit 1; }
+test -f src/content/page_learner.js || { echo "[x] Missing page_learner.js"; exit 1; }
 test -f src/content/in_page_agent.css || { echo "[x] Missing in_page_agent.css"; exit 1; }
 test -f src/content/in_page_agent.js || { echo "[x] Missing in_page_agent.js"; exit 1; }
 test -f src/content/docs_observer.js || { echo "[x] Missing docs_observer.js"; exit 1; }

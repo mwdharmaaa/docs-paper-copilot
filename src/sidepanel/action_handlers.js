@@ -30,6 +30,20 @@ export const ActionHandlers = {
     }
   },
 
+  async fetchPageProfile(forceRefresh = false) {
+    const tab = await this.getActiveTab();
+    if (!tab?.id) return null;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, {
+        action: "GET_PAGE_PROFILE",
+        forceRefresh
+      });
+      return res?.pageProfile || null;
+    } catch {
+      return null;
+    }
+  },
+
   async autoTypeToDocs(text, speedMs = 16) {
     if (!text) throw new Error("Tidak ada konten untuk diketik.");
     const tab = await this.getActiveTab();
@@ -58,12 +72,13 @@ export const ActionHandlers = {
     }
   },
 
-  async askGemini(prompt, selectedContext = "") {
+  async askGemini(prompt, selectedContext = "", pageProfile = null) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
         type: "ASK_GEMINI",
         prompt,
-        selectedContext
+        selectedContext,
+        pageProfile
       }, (res) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
