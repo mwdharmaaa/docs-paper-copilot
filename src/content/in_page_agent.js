@@ -126,47 +126,69 @@
 
     const selected = getSelectedDocText();
 
-    chrome.runtime.sendMessage({
-      type: "ASK_GEMINI",
-      prompt: promptText,
-      selectedContext: selected
-    }, (res) => {
-      if (chrome.runtime.lastError || !res?.success) {
-        statusEl.textContent = `Error: ${res?.error || chrome.runtime.lastError?.message || "Gagal memproses"}`;
+    try {
+      if (!chrome.runtime?.id) {
+        statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh halaman Docs (Ctrl+R / F5).";
         runBtn.disabled = false;
         stopBtn.style.display = "none";
         return;
       }
 
-      statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Sedang ngetik otomatis ke Docs...';
-
-      if (window.AutoTyper) {
-        window.AutoTyper.typeStream(res.text, {
-          speedMs: 12,
-          onProgress: (p) => {
-            statusEl.textContent = `Ngetik ke dokumen: ${p.percent}%`;
-          },
-          onComplete: () => {
-            statusEl.textContent = "Selesai ngetik ke halaman.";
-            runBtn.disabled = false;
-            stopBtn.style.display = "none";
-          },
-          onError: (err) => {
-            statusEl.textContent = `Error: ${err}`;
-            runBtn.disabled = false;
-            stopBtn.style.display = "none";
-          },
-          onCancel: () => {
-            statusEl.textContent = "Pengetikan dibatalkan.";
-            runBtn.disabled = false;
-            stopBtn.style.display = "none";
+      chrome.runtime.sendMessage({
+        type: "ASK_GEMINI",
+        prompt: promptText,
+        selectedContext: selected
+      }, (res) => {
+        if (chrome.runtime.lastError || !res?.success) {
+          const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";
+          if (rawErr.includes("context invalidated") || rawErr.includes("Extension context")) {
+            statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh halaman Docs (Ctrl+R / F5).";
+          } else {
+            statusEl.textContent = `Error: ${rawErr}`;
           }
-        });
+          runBtn.disabled = false;
+          stopBtn.style.display = "none";
+          return;
+        }
+
+        statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Sedang ngetik otomatis ke Docs...';
+
+        if (window.AutoTyper) {
+          window.AutoTyper.typeStream(res.text, {
+            speedMs: 12,
+            onProgress: (p) => {
+              statusEl.textContent = `Ngetik ke dokumen: ${p.percent}%`;
+            },
+            onComplete: () => {
+              statusEl.textContent = "Selesai ngetik ke halaman.";
+              runBtn.disabled = false;
+              stopBtn.style.display = "none";
+            },
+            onError: (err) => {
+              statusEl.textContent = `Error: ${err}`;
+              runBtn.disabled = false;
+              stopBtn.style.display = "none";
+            },
+            onCancel: () => {
+              statusEl.textContent = "Pengetikan dibatalkan.";
+              runBtn.disabled = false;
+              stopBtn.style.display = "none";
+            }
+          });
+        } else {
+          statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
+          runBtn.disabled = false;
+          stopBtn.style.display = "none";
+        }
+      });
+    } catch (err) {
+      if (err.message && (err.message.includes("context invalidated") || err.message.includes("Extension context"))) {
+        statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh halaman Docs (Ctrl+R / F5).";
       } else {
-        statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
-        runBtn.disabled = false;
-        stopBtn.style.display = "none";
+        statusEl.textContent = `Error: ${err.message || err}`;
       }
-    });
+      runBtn.disabled = false;
+      stopBtn.style.display = "none";
+    }
   };
 })();
