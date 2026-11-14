@@ -279,8 +279,23 @@
       return true;
     },
 
-    instantInsert(rawText, options = {}) {
-      const { onProgress, onComplete, onError } = options;
+    splitIntoParagraphs(text) {
+      if (!text || typeof text !== "string") return [];
+      if (/\r?\n\s*\r?\n/.test(text)) {
+        return text.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).filter(Boolean);
+      }
+      return text.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
+    },
+
+    async typeParagraphs(rawText, options = {}) {
+      const {
+        paragraphDelayMs = 350,
+        onProgress,
+        onComplete,
+        onCancel,
+        onError
+      } = options;
+
       if (!rawText || rawText.length === 0) {
         if (onComplete) onComplete();
         return true;
@@ -296,6 +311,8 @@
 
       this.focusEditor();
       this.ensureNormalFont();
+      await new Promise((res) => setTimeout(res, 40));
+      this.focusEditor();
 
       const target = this.getEditorTarget();
       if (!target) {
@@ -304,21 +321,59 @@
         return false;
       }
 
-      const text = this.cleanMarkdownForDocs(rawText);
-      const chars = Array.from(text);
-      const total = chars.length;
+      const cleanText = this.cleanMarkdownForDocs(rawText);
+      const paragraphs = this.splitIntoParagraphs(cleanText);
+      const total = paragraphs.length;
+
+      if (total === 0) {
+        this.isTyping = false;
+        if (onComplete) onComplete();
+        return true;
+      }
 
       for (let i = 0; i < total; i++) {
         if (this.abortRequested) {
           this.isTyping = false;
           this.abortRequested = false;
+          if (onCancel) onCancel();
           return false;
         }
 
-        this.insertChar(chars[i]);
+        // Ensure Docs remains in regular (normal) font
+        this.ensureNormalFont();
 
-        if (onProgress && (i % 25 === 0 || i === total - 1)) {
-          onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
+        const p = paragraphs[i];
+        const lines = p.split(/\r?\n/);
+        for (let l = 0; l < lines.length; l++) {
+          const line = lines[l];
+          const chars = Array.from(line);
+          for (let c = 0; c < chars.length; c++) {
+            this.insertChar(chars[c]);
+          }
+          if (l < lines.length - 1) {
+            this.insertChar("\n");
+          }
+        }
+
+        const percent = Math.round(((i + 1) / total) * 100);
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total,
+            percent,
+            paragraphIndex: i + 1,
+            totalParagraphs: total
+          });
+        }
+
+        // Insert paragraph separation and pause with an elegant cadence
+        if (i < total - 1) {
+          this.insertChar("\n");
+          this.insertChar("\n");
+
+          if (paragraphDelayMs > 0) {
+            await new Promise((res) => setTimeout(res, paragraphDelayMs));
+          }
         }
       }
 
@@ -327,66 +382,23 @@
       return true;
     },
 
+    instantInsert(rawText, options = {}) {
+      return this.typeParagraphs(rawText, {
+        paragraphDelayMs: 0,
+        ...options
+      });
+    },
+
     async typeStream(text, options = {}) {
-      const { speedMs = 0, onProgress, onComplete, onCancel, onError } = options;
+      const { speedMs, paragraphDelayMs, ...rest } = options;
+      const delay = paragraphDelayMs !== undefined
+        ? paragraphDelayMs
+        : (speedMs ? Math.max(120, speedMs * 30) : 350);
 
-      if (!text || text.length === 0) {
-        if (onComplete) onComplete();
-        return;
-      }
-
-      // If speedMs is 0 or unassigned, execute instant insertion directly
-      if (!speedMs || speedMs <= 0) {
-        this.instantInsert(text, { onProgress, onComplete, onError });
-        return;
-      }
-
-      this.isTyping = true;
-      this.abortRequested = false;
-
-      if (document.activeElement && typeof document.activeElement.blur === "function") {
-        document.activeElement.blur();
-      }
-
-      this.focusEditor();
-      this.ensureNormalFont();
-      await new Promise((res) => setTimeout(res, 30));
-      this.focusEditor();
-
-      const target = this.getEditorTarget();
-      if (!target) {
-        this.isTyping = false;
-        if (onError) onError("Target editor Google Docs tidak ditemukan.");
-        return;
-      }
-
-      const cleanText = this.cleanMarkdownForDocs(text);
-      const chars = Array.from(cleanText);
-      const total = chars.length;
-
-      for (let i = 0; i < total; i++) {
-        if (this.abortRequested) {
-          this.isTyping = false;
-          this.abortRequested = false;
-          if (onCancel) onCancel();
-          return;
-        }
-
-        const ch = chars[i];
-        this.insertChar(ch);
-
-        if (onProgress && (i % 6 === 0 || i === total - 1)) {
-          onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
-        }
-
-        const delay = (ch === "\n" || ch === " ") ? Math.max(2, speedMs / 2) : speedMs;
-        if (delay > 0) {
-          await new Promise((res) => setTimeout(res, delay));
-        }
-      }
-
-      this.isTyping = false;
-      if (onComplete) onComplete();
+      return this.typeParagraphs(text, {
+        paragraphDelayMs: delay,
+        ...rest
+      });
     },
 
     stop() {

@@ -151,13 +151,14 @@
           return;
         }
 
-        statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Sedang menulis langsung ke Docs...';
+        statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Menyiapkan tulisan...';
 
         if (window.AutoTyper) {
           setTimeout(() => {
-            window.AutoTyper.instantInsert(res.text, {
+            window.AutoTyper.typeParagraphs(res.text, {
+              paragraphDelayMs: 350,
               onProgress: (p) => {
-                statusEl.textContent = `Menulis ke dokumen: ${p.percent}%`;
+                statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Menulis paragraf ${p.paragraphIndex} dari ${p.totalParagraphs} (${p.percent}%)...`;
               },
               onComplete: () => {
                 statusEl.textContent = "Selesai menulis ke halaman.";
@@ -168,9 +169,14 @@
                 statusEl.textContent = `Error: ${err}`;
                 runBtn.disabled = false;
                 stopBtn.style.display = "none";
+              },
+              onCancel: () => {
+                statusEl.textContent = "Penulisan dihentikan.";
+                runBtn.disabled = false;
+                stopBtn.style.display = "none";
               }
             });
-          }, 35);
+          }, 40);
         } else {
           statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
           runBtn.disabled = false;
