@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ask Gemini for Google Docs - Auto-Type AI",
+  "name": "GTyipe",
   "version": "2.0.0",
   "description": "Ask Gemini side panel and in-document assistant for Google Docs with autonomous real-time typing into your document.",
   "icons": {
@@ -26,7 +26,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Ask Gemini for Google Docs",
+    "default_title": "GTyipe for Google Docs",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
