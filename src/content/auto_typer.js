@@ -9,15 +9,38 @@
     abortRequested: false,
 
     getEditorIframe() {
-      return document.querySelector(".docs-texteventtarget-iframe");
+      return (
+        document.querySelector("iframe.docs-texteventtarget-iframe") ||
+        document.querySelector(".docs-texteventtarget-iframe") ||
+        document.querySelector("iframe[class*='texteventtarget']")
+      );
     },
 
     getEditorTarget() {
       const iframe = this.getEditorIframe();
-      if (iframe && iframe.contentDocument) {
-        return iframe.contentDocument.body || iframe.contentDocument.activeElement;
+      if (iframe) {
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (doc) {
+            const editable =
+              doc.querySelector("[contenteditable='true']") ||
+              doc.querySelector("[role='textbox']") ||
+              (doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null) ||
+              doc.body;
+            if (editable) return editable;
+          }
+        } catch (e) {
+          console.warn("[AutoTyper] Accessing iframe document restricted:", e);
+        }
       }
-      return document.activeElement || document.body;
+
+      return (
+        document.querySelector(".kix-appview-editor [contenteditable='true']") ||
+        document.querySelector(".kix-appview-editor [role='textbox']") ||
+        document.querySelector("[contenteditable='true']") ||
+        document.querySelector(".kix-appview-editor") ||
+        document.body
+      );
     },
 
     focusEditor() {
@@ -30,65 +53,127 @@
         if (target && typeof target.focus === "function") {
           target.focus();
         }
-      } catch {
-        // Fallback if cross-frame restrictions occur
+      } catch (err) {
+        console.warn("[AutoTyper] focusEditor fallback:", err);
       }
     },
 
     insertChunk(chunk) {
-      this.focusEditor();
       const iframe = this.getEditorIframe();
-      let handled = false;
+      const target = this.getEditorTarget();
+      if (!target) return false;
 
-      // Strategy 1: execCommand insertText in iframe context
-      if (iframe && iframe.contentDocument) {
-        try {
-          handled = iframe.contentDocument.execCommand("insertText", false, chunk);
-        } catch {
-          handled = false;
-        }
-      }
+      this.focusEditor();
 
-      // Strategy 2: Synthetic Clipboard paste event
-      if (!handled) {
-        const target = this.getEditorTarget();
-        try {
-          const dt = new DataTransfer();
-          dt.setData("text/plain", chunk);
-          const pasteEv = new ClipboardEvent("paste", {
-            clipboardData: dt,
-            bubbles: true,
-            cancelable: true
-          });
-          target.dispatchEvent(pasteEv);
-          handled = true;
-        } catch {
-          handled = false;
-        }
-      }
+      const isNewline = (chunk === "\n" || chunk === "\r\n" || chunk === "\r");
 
-      // Strategy 3: Synthetic inputEvent
-      if (!handled) {
-        const target = this.getEditorTarget();
+      if (isNewline) {
         try {
-          const inputEv = new InputEvent("beforeinput", {
+          target.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
             bubbles: true,
             cancelable: true,
-            inputType: "insertText",
-            data: chunk
-          });
-          target.dispatchEvent(inputEv);
-          handled = true;
-        } catch {
-          handled = false;
+            composed: true
+          }));
+
+          target.dispatchEvent(new InputEvent("beforeinput", {
+            inputType: "insertParagraph",
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+
+          let execSuccess = false;
+          if (iframe && iframe.contentDocument) {
+            try {
+              execSuccess = iframe.contentDocument.execCommand("insertParagraph", false);
+            } catch {}
+          }
+          if (!execSuccess) {
+            try {
+              execSuccess = document.execCommand("insertParagraph", false);
+            } catch {}
+          }
+
+          target.dispatchEvent(new InputEvent("input", {
+            inputType: "insertParagraph",
+            bubbles: true,
+            cancelable: false,
+            composed: true
+          }));
+
+          target.dispatchEvent(new KeyboardEvent("keyup", {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+
+          return true;
+        } catch (e) {
+          console.warn("[AutoTyper] insert newline failed:", e);
+          return false;
         }
       }
 
-      return handled;
+      try {
+        target.dispatchEvent(new KeyboardEvent("keydown", {
+          key: chunk,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        target.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: chunk,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        let execHandled = false;
+        if (iframe && iframe.contentDocument) {
+          try {
+            execHandled = iframe.contentDocument.execCommand("insertText", false, chunk);
+          } catch {}
+        }
+        if (!execHandled) {
+          try {
+            execHandled = document.execCommand("insertText", false, chunk);
+          } catch {}
+        }
+
+        target.dispatchEvent(new InputEvent("input", {
+          inputType: "insertText",
+          data: chunk,
+          bubbles: true,
+          cancelable: false,
+          composed: true
+        }));
+
+        target.dispatchEvent(new KeyboardEvent("keyup", {
+          key: chunk,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        return true;
+      } catch (err) {
+        console.warn("[AutoTyper] insertChunk failed:", err);
+        return false;
+      }
     },
 
     async typeStream(text, options = {}) {
-      const { speedMs = 18, chunkSize = 1, onProgress, onComplete, onCancel } = options;
+      const { speedMs = 12, chunkSize = 1, onProgress, onComplete, onCancel, onError } = options;
 
       if (!text || text.length === 0) {
         if (onComplete) onComplete();
@@ -98,7 +183,23 @@
       this.isTyping = true;
       this.abortRequested = false;
 
-      const tokens = text.match(/(\s+|\S+)/g) || [text];
+      // Blur any active element in the top document (e.g. extension modal/button)
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+
+      this.focusEditor();
+      await new Promise((res) => setTimeout(res, 50));
+      this.focusEditor();
+
+      const target = this.getEditorTarget();
+      if (!target) {
+        this.isTyping = false;
+        if (onError) onError("Target editor Google Docs tidak ditemukan.");
+        return;
+      }
+
+      const tokens = text.match(/(\r\n|\n|\r|[^\S\r\n]+|\S+)/g) || [text];
       const total = tokens.length;
 
       for (let i = 0; i < total; i++) {
@@ -116,7 +217,8 @@
           onProgress({ current: i + 1, total, percent: Math.round(((i + 1) / total) * 100) });
         }
 
-        const delay = token.trim().length === 0 ? speedMs / 2 : speedMs;
+        const isNewlineOrSpace = /^(\r\n|\n|\r|\s+)$/.test(token);
+        const delay = isNewlineOrSpace ? Math.max(4, speedMs / 2) : speedMs;
         await new Promise((res) => setTimeout(res, delay));
       }
 
@@ -125,8 +227,21 @@
     },
 
     instantInsert(text) {
+      if (!text) return false;
       this.focusEditor();
-      return this.insertChunk(text);
+      const target = this.getEditorTarget();
+      if (!target) return false;
+
+      const lines = text.split(/\r\n|\n|\r/);
+      for (let i = 0; i < lines.length; i++) {
+        if (i > 0) {
+          this.insertChunk("\n");
+        }
+        if (lines[i].length > 0) {
+          this.insertChunk(lines[i]);
+        }
+      }
+      return true;
     },
 
     stop() {

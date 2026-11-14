@@ -22,6 +22,13 @@
   }
 
   function getSelectedTextFallback() {
+    try {
+      const iframe = document.querySelector(".docs-texteventtarget-iframe");
+      if (iframe && iframe.contentDocument) {
+        const frameSel = iframe.contentDocument.getSelection()?.toString().trim();
+        if (frameSel) return frameSel;
+      }
+    } catch {}
     const sel = window.getSelection();
     if (sel && sel.toString().trim().length > 0) {
       return sel.toString().trim();

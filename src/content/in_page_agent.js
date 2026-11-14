@@ -98,6 +98,17 @@
     runBtn.disabled = false;
   };
 
+  function getSelectedDocText() {
+    try {
+      const iframe = document.querySelector(".docs-texteventtarget-iframe");
+      if (iframe && iframe.contentDocument) {
+        const frameSel = iframe.contentDocument.getSelection()?.toString().trim();
+        if (frameSel) return frameSel;
+      }
+    } catch {}
+    return window.getSelection()?.toString().trim() || "";
+  }
+
   runBtn.onclick = async () => {
     const promptText = promptInput.value.trim();
     if (!promptText) {
@@ -109,7 +120,11 @@
     stopBtn.style.display = "inline-block";
     statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Gemini sedang berpikir...';
 
-    const selected = window.getSelection()?.toString().trim() || "";
+    // Blur modal controls so Docs iframe can regain focus smoothly
+    promptInput.blur();
+    runBtn.blur();
+
+    const selected = getSelectedDocText();
 
     chrome.runtime.sendMessage({
       type: "ASK_GEMINI",
@@ -127,12 +142,17 @@
 
       if (window.AutoTyper) {
         window.AutoTyper.typeStream(res.text, {
-          speedMs: 10,
+          speedMs: 12,
           onProgress: (p) => {
             statusEl.textContent = `Ngetik ke dokumen: ${p.percent}%`;
           },
           onComplete: () => {
             statusEl.textContent = "Selesai ngetik ke halaman.";
+            runBtn.disabled = false;
+            stopBtn.style.display = "none";
+          },
+          onError: (err) => {
+            statusEl.textContent = `Error: ${err}`;
             runBtn.disabled = false;
             stopBtn.style.display = "none";
           },
@@ -142,6 +162,10 @@
             stopBtn.style.display = "none";
           }
         });
+      } else {
+        statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
+        runBtn.disabled = false;
+        stopBtn.style.display = "none";
       }
     });
   };

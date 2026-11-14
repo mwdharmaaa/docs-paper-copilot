@@ -5,14 +5,26 @@
 
 (function initDocsBridge() {
   function getDocsEditorTarget() {
+    if (window.AutoTyper && typeof window.AutoTyper.getEditorTarget === "function") {
+      return window.AutoTyper.getEditorTarget();
+    }
     const iframe = document.querySelector(".docs-texteventtarget-iframe");
     if (iframe && iframe.contentDocument) {
-      return iframe.contentDocument.body;
+      return (
+        iframe.contentDocument.querySelector("[contenteditable=true]") ||
+        iframe.contentDocument.querySelector("[role=textbox]") ||
+        iframe.contentDocument.body
+      );
     }
     return document.activeElement || document.body;
   }
 
   function simulatePaste(text) {
+    if (window.AutoTyper && typeof window.AutoTyper.instantInsert === "function") {
+      const inserted = window.AutoTyper.instantInsert(text);
+      if (inserted) return true;
+    }
+
     const target = getDocsEditorTarget();
     if (!target) return false;
 
@@ -71,11 +83,17 @@
       }
 
       navigator.clipboard.writeText(text).then(() => {
-        const injected = simulatePaste(text);
-        if (injected) {
-          showDocsNotification("Revision pasted into document.");
+        let injected = false;
+        if (window.AutoTyper && typeof window.AutoTyper.instantInsert === "function") {
+          injected = window.AutoTyper.instantInsert(text);
         } else {
-          showDocsNotification("Polished text copied to clipboard. Press Ctrl+V in Docs.");
+          injected = simulatePaste(text);
+        }
+
+        if (injected) {
+          showDocsNotification("Revisi berhasil dimasukkan ke dokumen.");
+        } else {
+          showDocsNotification("Teks telah disalin ke clipboard. Tekan Ctrl+V di Docs.");
         }
         sendResponse({ success: true, pasted: injected });
       }).catch((err) => {
@@ -95,15 +113,18 @@
 
       if (window.AutoTyper) {
         window.AutoTyper.typeStream(text, {
-          speedMs: speedMs || 16,
+          speedMs: speedMs || 12,
           onComplete: () => {
             showDocsNotification("Selesai ngetik otomatis ke dokumen.");
+          },
+          onError: (err) => {
+            showDocsNotification(err || "Gagal ngetik ke dokumen.", false);
           }
         });
         sendResponse({ success: true, started: true });
       } else {
-        simulatePaste(text);
-        sendResponse({ success: true, fallback: "paste" });
+        const injected = simulatePaste(text);
+        sendResponse({ success: true, fallback: "paste", pasted: injected });
       }
       return true;
     }
