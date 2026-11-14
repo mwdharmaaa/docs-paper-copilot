@@ -127,7 +127,7 @@
     const selected = getSelectedDocText();
 
     try {
-      if (!chrome.runtime?.id) {
+      if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id || typeof chrome.runtime.sendMessage !== "function") {
         statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh halaman Docs (Ctrl+R / F5).";
         runBtn.disabled = false;
         stopBtn.style.display = "none";
