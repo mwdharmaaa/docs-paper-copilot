@@ -6,26 +6,26 @@
 
 import { PromptTemplates } from "./prompt_templates.js";
 
-const DEFAULT_TIMEOUT_MS = 60000; // 60 seconds for complex discussions and document drafting
+const DEFAULT_TIMEOUT_MS = 75000; // 75 seconds for long-form academic chapters and discussions
 
 export const AIClient = {
-  async executeGemini({ apiKey, model, prompt, contents, systemDirective, temperature = 0.2 }) {
+  async executeGemini({ apiKey, model, prompt, contents, systemDirective, temperature = 0.35 }) {
     if (!apiKey) {
       throw new Error("API Key belum diisi. Masukkan Gemini API Key di tab Pengaturan.");
     }
 
-    const defaultModel = "gemini-3.5-flash-lite";
+    const defaultModel = "gemini-3.5-flash";
     let chosenModel = model || defaultModel;
 
-    // Normalize deprecated models to modern Gemini models
+    // Normalize deprecated models
     if (chosenModel.includes("gemini-2.5") || chosenModel.includes("gemini-2.0") || chosenModel.includes("gemini-1.5")) {
       chosenModel = chosenModel.includes("pro") ? "gemini-3.8-pro" : defaultModel;
     }
 
-    // Fast-fallback chain: Preferred model first, then default gemini-3.5-flash-lite
+    // Fast-fallback chain: Preferred model first, then ultra-reliable gemini-3.5-flash-lite
     const modelsToTry = [chosenModel];
-    if (chosenModel !== defaultModel) {
-      modelsToTry.push(defaultModel);
+    if (chosenModel !== "gemini-3.5-flash-lite") {
+      modelsToTry.push("gemini-3.5-flash-lite");
     }
 
     // Prepare contents array
@@ -43,8 +43,9 @@ export const AIClient = {
       const payload = {
         contents: contentsPayload,
         generationConfig: {
-          temperature: parseFloat(temperature) || 0.2,
-          topP: 0.95
+          temperature: parseFloat(temperature) || 0.35,
+          topP: 0.95,
+          maxOutputTokens: 8192
         }
       };
 
@@ -76,7 +77,7 @@ export const AIClient = {
           const errorData = await response.json().catch(() => ({}));
           const message = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
 
-          // If systemInstruction is rejected by any legacy model variant, try again without it
+          // If systemInstruction is rejected, try again without it
           if (payload.systemInstruction && message.toLowerCase().includes("systeminstruction")) {
             delete payload.systemInstruction;
             const retryRes = await fetch(endpoint, {
@@ -117,7 +118,7 @@ export const AIClient = {
     throw lastError || new Error("Gagal menghubungi layanan Gemini API.");
   },
 
-  async executeOpenAI({ apiKey, model, prompt, messages, systemDirective, temperature = 0.2 }) {
+  async executeOpenAI({ apiKey, model, prompt, messages, systemDirective, temperature = 0.35 }) {
     if (!apiKey) {
       throw new Error("OpenAI API Key belum diisi. Masukkan API Key di tab Pengaturan.");
     }
@@ -141,9 +142,10 @@ export const AIClient = {
     }
 
     const payload = {
-      model: model || "gpt-4o-mini",
+      model: model || "gpt-4o",
       messages: formattedMessages,
-      temperature: parseFloat(temperature) || 0.2
+      temperature: parseFloat(temperature) || 0.35,
+      max_tokens: 4096
     };
 
     const controller = new AbortController();
@@ -191,11 +193,11 @@ export const AIClient = {
   },
 
   async generate(settings, prompt) {
-    let { provider = "gemini", apiKey, model = "gemini-3.5-flash-lite", temperature } = settings;
+    let { provider = "gemini", apiKey, model = "gemini-3.5-flash", temperature } = settings;
 
     if (provider === "gemini") {
       if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
-        model = model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash-lite";
+        model = model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash";
       }
       return this.executeGemini({ apiKey, model, prompt, temperature });
     }
@@ -204,7 +206,7 @@ export const AIClient = {
   },
 
   async generateChat(settings, { prompt, history = [], mode = "discuss", selectedContext = "", pageProfile = null }) {
-    let { provider = "gemini", apiKey, model = "gemini-3.5-flash-lite", temperature } = settings;
+    let { provider = "gemini", apiKey, model = "gemini-3.5-flash", temperature } = settings;
 
     const systemDirective = PromptTemplates.getSystemDirective(mode, pageProfile);
 
@@ -216,7 +218,7 @@ export const AIClient = {
 
     if (provider === "gemini") {
       if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
-        model = model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash-lite";
+        model = model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash";
       }
 
       // Build Gemini contents array from history + current message
@@ -239,7 +241,7 @@ export const AIClient = {
         parts: [{ text: currentPromptText }]
       });
 
-      const tempToUse = temperature !== undefined ? temperature : (mode === "discuss" ? 0.6 : 0.2);
+      const tempToUse = temperature !== undefined ? temperature : (mode === "discuss" ? 0.4 : 0.2);
 
       return this.executeGemini({
         apiKey,
@@ -262,7 +264,7 @@ export const AIClient = {
     }
     messages.push({ role: "user", content: currentPromptText });
 
-    const tempToUse = temperature !== undefined ? temperature : (mode === "discuss" ? 0.6 : 0.2);
+    const tempToUse = temperature !== undefined ? temperature : (mode === "discuss" ? 0.4 : 0.2);
 
     return this.executeOpenAI({
       apiKey,

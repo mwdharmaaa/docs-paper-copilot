@@ -1,6 +1,6 @@
 /**
  * Docs Paper Copilot - In-Page "Help Me Write" & Discussion Agent
- * Renders the in-document GTyipe widget with interactive discussions,
+ * Renders the in-document GTyipe widget with scholar-grade discussions,
  * multi-turn conversation memory, and streaming automated typing into Google Docs.
  * Strictly zero emojis and pure monochrome styling.
  */
@@ -8,6 +8,33 @@
 (function initGeminiInPageAgent() {
   if (window.__docsGeminiAgentInitialized) return;
   window.__docsGeminiAgentInitialized = true;
+
+  function parseResponseDraft(rawText) {
+    if (!rawText || typeof rawText !== "string") {
+      return { discussionText: "", draftText: "", hasDraft: false };
+    }
+
+    const match = rawText.match(/<<<DRAF_DOKUMEN>>>([\s\S]*?)<<<AKHIR_DRAF_DOKUMEN>>>/);
+    if (match) {
+      const draftText = match[1].trim();
+      const discussionText = rawText.replace(/<<<DRAF_DOKUMEN>>>[\s\S]*?<<<AKHIR_DRAF_DOKUMEN>>>/, "").trim();
+      return {
+        discussionText,
+        draftText,
+        hasDraft: true
+      };
+    }
+
+    return {
+      discussionText: rawText.trim(),
+      draftText: rawText.trim(),
+      hasDraft: false
+    };
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
 
   const root = document.createElement("div");
   root.id = "docs-gemini-agent-root";
@@ -257,13 +284,18 @@
       return;
     }
 
+    // Clean draft delimiters if any
+    const cleanContent = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
+      ? window.AutoTyper.cleanMarkdownForDocs(textToType)
+      : textToType;
+
     stopBtn.style.display = "inline-block";
     statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Menyiapkan pengetikan ke dokumen...';
 
     if (window.AutoTyper) {
       setTimeout(() => {
-        window.AutoTyper.typeParagraphs(textToType, {
-          paragraphDelayMs: 350,
+        window.AutoTyper.typeParagraphs(cleanContent, {
+          paragraphDelayMs: 250,
           onProgress: (p) => {
             statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Mengetik paragraf ${p.paragraphIndex} dari ${p.totalParagraphs} (${p.percent}%)...`;
           },
@@ -295,19 +327,38 @@
   };
 
   // Render message item in in-page chat feed
-  function appendInPageMessage(role, text) {
+  function appendInPageMessage(role, rawText) {
     if (inpageDiscussEmpty) inpageDiscussEmpty.style.display = "none";
 
     const msgBox = document.createElement("div");
     msgBox.className = role === "user" ? "inpage-msg-user" : "inpage-msg-assistant";
 
     if (role === "user") {
-      msgBox.textContent = text;
+      msgBox.textContent = rawText;
     } else {
-      const contentEl = document.createElement("div");
-      contentEl.className = "inpage-msg-content";
-      contentEl.textContent = text;
-      msgBox.appendChild(contentEl);
+      const { discussionText, draftText, hasDraft } = parseResponseDraft(rawText);
+
+      if (discussionText) {
+        const discEl = document.createElement("div");
+        discEl.className = "inpage-msg-content";
+        discEl.textContent = discussionText;
+        msgBox.appendChild(discEl);
+      }
+
+      if (hasDraft) {
+        const draftBox = document.createElement("div");
+        draftBox.className = "inpage-draft-box";
+        draftBox.innerHTML = `
+          <div class="inpage-draft-header">
+            <span class="inpage-draft-badge">DRAF DOKUMEN SIAP KETIK</span>
+          </div>
+          <div class="inpage-draft-content">${escapeHtml(draftText)}</div>
+        `;
+        msgBox.appendChild(draftBox);
+      }
+
+      // Content that will be typed into Google Docs (clean draft prioritized)
+      const targetContent = hasDraft ? draftText : (discussionText || rawText);
 
       // Action toolbar for assistant response
       const actionsEl = document.createElement("div");
@@ -318,7 +369,7 @@
       btnType.className = "inpage-msg-action-btn primary";
       btnType.textContent = "Ketik Otomatis ke Docs";
       btnType.onclick = () => {
-        startTypingToDocs(text);
+        startTypingToDocs(targetContent);
       };
 
       const btnInsert = document.createElement("button");
@@ -327,11 +378,11 @@
       btnInsert.textContent = "Insert";
       btnInsert.onclick = () => {
         if (window.DocsBridge && window.DocsBridge.injectText) {
-          window.DocsBridge.injectText(text);
-          statusEl.textContent = "Teks dimasukkan ke dokumen.";
+          window.DocsBridge.injectText(targetContent);
+          statusEl.textContent = "Draf dimasukkan ke dokumen.";
         } else {
-          navigator.clipboard.writeText(text);
-          statusEl.textContent = "Teks disalin ke clipboard.";
+          navigator.clipboard.writeText(targetContent);
+          statusEl.textContent = "Draf disalin ke clipboard.";
         }
       };
 
@@ -340,8 +391,8 @@
       btnCopy.className = "inpage-msg-action-btn";
       btnCopy.textContent = "Salin";
       btnCopy.onclick = () => {
-        navigator.clipboard.writeText(text);
-        statusEl.textContent = "Teks disalin ke clipboard.";
+        navigator.clipboard.writeText(targetContent);
+        statusEl.textContent = "Draf disalin ke clipboard.";
       };
 
       actionsEl.appendChild(btnType);
@@ -364,7 +415,7 @@
 
     discussInput.value = "";
     sendDiscussBtn.disabled = true;
-    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> GTyipe sedang berdiskusi...';
+    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> GTyipe sedang menyusun analisis akademis...';
 
     const selected = getSelectedDocText();
     const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
@@ -395,7 +446,7 @@
         const reply = res.text;
         inPageHistory.push({ role: "model", text: reply });
         appendInPageMessage("assistant", reply);
-        statusEl.textContent = "Tanggapan siap. Pilih 'Ketik Otomatis ke Docs' atau lanjutkan diskusi.";
+        statusEl.textContent = "Tanggapan siap. Klik 'Ketik Otomatis ke Docs' untuk mengetik draf ke halaman.";
       });
     } catch (err) {
       sendDiscussBtn.disabled = false;
@@ -457,7 +508,8 @@
           return;
         }
 
-        startTypingToDocs(res.text);
+        const { draftText } = parseResponseDraft(res.text);
+        startTypingToDocs(draftText);
       });
     } catch (err) {
       runBtn.disabled = false;

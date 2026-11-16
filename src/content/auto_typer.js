@@ -1,6 +1,8 @@
 /**
  * Docs Paper Copilot - Auto Typer Engine
- * Simulates human-like or high-speed automated typing into Google Docs editor target.
+ * Simulates elegant, reliable paragraph-by-paragraph and streaming automated typing
+ * into Google Docs editor target without character dropping or text corruption.
+ * Strictly zero emojis and pure monochrome workflow.
  */
 
 (function initAutoTyper() {
@@ -63,6 +65,10 @@
 
       let s = text;
 
+      // 0. Remove special draft delimiters if present
+      s = s.replace(/<<<DRAF_DOKUMEN>>>/g, "");
+      s = s.replace(/<<<AKHIR_DRAF_DOKUMEN>>>/g, "");
+
       // 1. Remove markdown code block markers
       s = s.replace(/^```[a-zA-Z]*\r?\n/gm, "");
       s = s.replace(/\r?\n```$/gm, "");
@@ -77,7 +83,7 @@
       // 4. Standardize bullet points: replace '* item' with '- item'
       s = s.replace(/^[ \t]*\*[ \t]+/gm, "- ");
 
-      // 5. Clean parenthesized asterisk terms: (*Cyprinus carpio*) -> (Cyprinus carpio)
+      // 5. Clean parenthesized asterisk terms: (*Betta splendens*) -> (Betta splendens)
       s = s.replace(/\(\*+([^*]+)\*+\)/g, "($1)");
 
       // 6. Strip bold/italic asterisks: ***text*** -> text, **text** -> text, *text* -> text
@@ -131,106 +137,37 @@
       }
     },
 
-    insertChar(ch) {
+    insertNewline() {
       const iframe = this.getEditorIframe();
       const target = this.getEditorTarget();
       if (!target) return false;
 
       this.focusEditor();
 
-      if (ch === "\n" || ch === "\r") {
-        try {
-          target.dispatchEvent(new KeyboardEvent("keydown", {
-            key: "Enter",
-            code: "Enter",
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true,
-            composed: true
-          }));
-
-          target.dispatchEvent(new KeyboardEvent("keypress", {
-            key: "Enter",
-            code: "Enter",
-            charCode: 13,
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true,
-            composed: true
-          }));
-
-          target.dispatchEvent(new InputEvent("beforeinput", {
-            inputType: "insertParagraph",
-            bubbles: true,
-            cancelable: true,
-            composed: true
-          }));
-
-          if (iframe && iframe.contentDocument) {
-            try {
-              iframe.contentDocument.execCommand("insertParagraph", false);
-            } catch {}
-          }
-
-          target.dispatchEvent(new InputEvent("input", {
-            inputType: "insertParagraph",
-            bubbles: true,
-            cancelable: false,
-            composed: true
-          }));
-
-          target.dispatchEvent(new KeyboardEvent("keyup", {
-            key: "Enter",
-            code: "Enter",
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true,
-            composed: true
-          }));
-
-          return true;
-        } catch (e) {
-          console.warn("[AutoTyper] insert newline failed:", e);
-          return false;
-        }
-      }
-
-      // Single character
       try {
-        const charCode = ch.charCodeAt(0);
-        let code = "";
-        if (ch >= "A" && ch <= "Z") code = "Key" + ch;
-        else if (ch >= "a" && ch <= "z") code = "Key" + ch.toUpperCase();
-        else if (ch >= "0" && ch <= "9") code = "Digit" + ch;
-        else if (ch === " ") code = "Space";
-
         target.dispatchEvent(new KeyboardEvent("keydown", {
-          key: ch,
-          code: code,
-          keyCode: charCode,
-          which: charCode,
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          which: 13,
           bubbles: true,
           cancelable: true,
           composed: true
         }));
 
         target.dispatchEvent(new KeyboardEvent("keypress", {
-          key: ch,
-          code: code,
-          charCode: charCode,
-          keyCode: charCode,
-          which: charCode,
+          key: "Enter",
+          code: "Enter",
+          charCode: 13,
+          keyCode: 13,
+          which: 13,
           bubbles: true,
           cancelable: true,
           composed: true
         }));
 
         target.dispatchEvent(new InputEvent("beforeinput", {
-          inputType: "insertText",
-          data: ch,
+          inputType: "insertParagraph",
           bubbles: true,
           cancelable: true,
           composed: true
@@ -238,45 +175,88 @@
 
         if (iframe && iframe.contentDocument) {
           try {
-            iframe.contentDocument.execCommand("insertText", false, ch);
+            iframe.contentDocument.execCommand("insertParagraph", false);
           } catch {}
         }
 
         target.dispatchEvent(new InputEvent("input", {
-          inputType: "insertText",
-          data: ch,
+          inputType: "insertParagraph",
           bubbles: true,
           cancelable: false,
           composed: true
         }));
 
         target.dispatchEvent(new KeyboardEvent("keyup", {
-          key: ch,
-          code: code,
-          keyCode: charCode,
-          which: charCode,
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          which: 13,
           bubbles: true,
           cancelable: true,
           composed: true
         }));
 
         return true;
-      } catch (err) {
-        console.warn("[AutoTyper] insertChar failed:", err);
+      } catch (e) {
+        console.warn("[AutoTyper] insert newline failed:", e);
         return false;
       }
     },
 
-    insertChunk(chunk) {
-      if (!chunk) return false;
-      if (chunk.length === 1) {
-        return this.insertChar(chunk);
+    insertChunk(textChunk) {
+      if (!textChunk) return false;
+      const iframe = this.getEditorIframe();
+      const target = this.getEditorTarget();
+      if (!target) return false;
+
+      this.focusEditor();
+
+      // Dispatch beforeinput
+      try {
+        target.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: textChunk,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+      } catch {}
+
+      // Execute atomic insertText into Google Docs iframe
+      let inserted = false;
+      if (iframe && iframe.contentDocument) {
+        try {
+          inserted = iframe.contentDocument.execCommand("insertText", false, textChunk);
+        } catch {}
       }
-      const chars = Array.from(chunk);
-      for (const ch of chars) {
-        this.insertChar(ch);
+
+      // Fallback via clipboard paste event if execCommand failed
+      if (!inserted) {
+        try {
+          const dt = new DataTransfer();
+          dt.setData("text/plain", textChunk);
+          const pasteEvent = new ClipboardEvent("paste", {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true
+          });
+          target.dispatchEvent(pasteEvent);
+          inserted = true;
+        } catch {}
       }
-      return true;
+
+      // Dispatch input event
+      try {
+        target.dispatchEvent(new InputEvent("input", {
+          inputType: "insertText",
+          data: textChunk,
+          bubbles: true,
+          cancelable: false,
+          composed: true
+        }));
+      } catch {}
+
+      return inserted;
     },
 
     splitIntoParagraphs(text) {
@@ -289,7 +269,7 @@
 
     async typeParagraphs(rawText, options = {}) {
       const {
-        paragraphDelayMs = 350,
+        paragraphDelayMs = 280,
         onProgress,
         onComplete,
         onCancel,
@@ -304,14 +284,14 @@
       this.isTyping = true;
       this.abortRequested = false;
 
-      // Blur parent window active elements (e.g. prompt textarea / button)
+      // Blur any active input controls outside Docs
       if (document.activeElement && typeof document.activeElement.blur === "function") {
         document.activeElement.blur();
       }
 
       this.focusEditor();
       this.ensureNormalFont();
-      await new Promise((res) => setTimeout(res, 40));
+      await new Promise((res) => setTimeout(res, 50));
       this.focusEditor();
 
       const target = this.getEditorTarget();
@@ -339,19 +319,23 @@
           return false;
         }
 
-        // Ensure Docs remains in regular (normal) font
         this.ensureNormalFont();
 
         const p = paragraphs[i];
         const lines = p.split(/\r?\n/);
+
         for (let l = 0; l < lines.length; l++) {
-          const line = lines[l];
-          const chars = Array.from(line);
-          for (let c = 0; c < chars.length; c++) {
-            this.insertChar(chars[c]);
+          if (this.abortRequested) break;
+
+          const line = lines[l].trim();
+          if (line) {
+            // Insert line as clean atomic chunk to prevent character dropping
+            this.insertChunk(line);
           }
+
           if (l < lines.length - 1) {
-            this.insertChar("\n");
+            this.insertNewline();
+            await new Promise((res) => setTimeout(res, 30));
           }
         }
 
@@ -366,10 +350,10 @@
           });
         }
 
-        // Insert paragraph separation and pause with an elegant cadence
+        // Insert paragraph separation and pause with smooth cadence
         if (i < total - 1) {
-          this.insertChar("\n");
-          this.insertChar("\n");
+          this.insertNewline();
+          this.insertNewline();
 
           if (paragraphDelayMs > 0) {
             await new Promise((res) => setTimeout(res, paragraphDelayMs));
@@ -393,7 +377,7 @@
       const { speedMs, paragraphDelayMs, ...rest } = options;
       const delay = paragraphDelayMs !== undefined
         ? paragraphDelayMs
-        : (speedMs ? Math.max(120, speedMs * 30) : 350);
+        : (speedMs ? Math.max(100, speedMs * 15) : 250);
 
       return this.typeParagraphs(text, {
         paragraphDelayMs: delay,

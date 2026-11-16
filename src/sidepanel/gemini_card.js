@@ -1,6 +1,7 @@
 /**
  * Docs Paper Copilot - Gemini Response Card Component
  * Strictly zero emojis and pure monochrome styling.
+ * Parses and separates discussion commentary from clean document drafts.
  */
 
 import { ActionHandlers } from "./action_handlers.js";
@@ -9,11 +10,48 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
+export function parseResponseDraft(rawText) {
+  if (!rawText || typeof rawText !== "string") {
+    return { discussionText: "", draftText: "", hasDraft: false };
+  }
+
+  const match = rawText.match(/<<<DRAF_DOKUMEN>>>([\s\S]*?)<<<AKHIR_DRAF_DOKUMEN>>>/);
+  if (match) {
+    const draftText = match[1].trim();
+    const discussionText = rawText.replace(/<<<DRAF_DOKUMEN>>>[\s\S]*?<<<AKHIR_DRAF_DOKUMEN>>>/, "").trim();
+    return {
+      discussionText,
+      draftText,
+      hasDraft: true
+    };
+  }
+
+  return {
+    discussionText: rawText.trim(),
+    draftText: rawText.trim(),
+    hasDraft: false
+  };
+}
+
+export function renderGeminiCard(rawText, speed, onStatus, mode = "discuss") {
   const card = document.createElement("div");
   card.className = "gemini-card";
 
-  const modeBadgeText = mode === "discuss" ? "Diskusi" : "Draf Dokumen";
+  const { discussionText, draftText, hasDraft } = parseResponseDraft(rawText);
+  const modeBadgeText = hasDraft ? "Draf Dokumen Siap" : (mode === "discuss" ? "Diskusi" : "Draf Dokumen");
+
+  let draftBoxHtml = "";
+  if (hasDraft) {
+    draftBoxHtml = `
+      <div class="gemini-draft-box">
+        <div class="gemini-draft-header">
+          <span class="gemini-draft-title">DRAF DOKUMEN SIAP KETIK</span>
+          <span class="gemini-draft-sub">Hanya bagian ini yang diketik ke Docs</span>
+        </div>
+        <div class="gemini-draft-body">${escapeHtml(draftText)}</div>
+      </div>
+    `;
+  }
 
   card.innerHTML = `
     <div class="gemini-card-header">
@@ -25,7 +63,10 @@ export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
       </div>
       <span class="card-mode-badge">${modeBadgeText}</span>
     </div>
-    <div class="gemini-card-body">${escapeHtml(text)}</div>
+
+    ${discussionText ? `<div class="gemini-card-body">${escapeHtml(discussionText)}</div>` : ""}
+    ${draftBoxHtml}
+
     <div class="card-action-bar">
       <button type="button" class="action-btn-type btn-auto-type">Ketik Otomatis ke Docs</button>
       <button type="button" class="action-btn-sec btn-instant-insert">Insert Langsung</button>
@@ -40,12 +81,13 @@ export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
     </div>
   `;
 
-  const bodyEl = card.querySelector(".gemini-card-body");
+  // Content to be typed/inserted into Google Docs (clean draft prioritized)
+  const targetContent = hasDraft ? draftText : (discussionText || rawText);
 
   card.querySelector(".btn-auto-type").onclick = async () => {
     onStatus("GTyipe sedang ngetik otomatis di dokumen Docs...");
     try {
-      await ActionHandlers.autoTypeToDocs(bodyEl.textContent, speed);
+      await ActionHandlers.autoTypeToDocs(targetContent, speed);
       onStatus("Selesai ngetik ke halaman.");
     } catch (err) {
       onStatus(`Error: ${err.message}`);
@@ -54,7 +96,7 @@ export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
 
   card.querySelector(".btn-instant-insert").onclick = async () => {
     try {
-      await ActionHandlers.insertToDocs(bodyEl.textContent);
+      await ActionHandlers.insertToDocs(targetContent);
       onStatus("Konten dimasukkan ke dokumen.");
     } catch (err) {
       onStatus(`Error: ${err.message}`);
@@ -63,8 +105,8 @@ export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
 
   card.querySelector(".btn-copy").onclick = async () => {
     try {
-      await navigator.clipboard.writeText(bodyEl.textContent);
-      onStatus("Konten disalin ke clipboard.");
+      await navigator.clipboard.writeText(targetContent);
+      onStatus("Draf disalin ke clipboard.");
     } catch (err) {
       onStatus(`Error: ${err.message}`);
     }
@@ -74,8 +116,14 @@ export function renderGeminiCard(text, speed, onStatus, mode = "discuss") {
     chip.onclick = async () => {
       onStatus(`Menyempurnakan (${chip.dataset.refine})...`);
       try {
-        const refined = await ActionHandlers.refineText(bodyEl.textContent, chip.dataset.refine);
-        bodyEl.textContent = refined;
+        const refined = await ActionHandlers.refineText(targetContent, chip.dataset.refine);
+        if (hasDraft) {
+          const draftBodyEl = card.querySelector(".gemini-draft-body");
+          if (draftBodyEl) draftBodyEl.textContent = refined;
+        } else {
+          const bodyEl = card.querySelector(".gemini-card-body");
+          if (bodyEl) bodyEl.textContent = refined;
+        }
         onStatus("Teks berhasil disempurnakan. Siap diketik ke Docs.");
       } catch (err) {
         onStatus(`Error refine: ${err.message}`);

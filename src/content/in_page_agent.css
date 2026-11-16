@@ -486,3 +486,44 @@
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
+
+/* In-Page Draft Box */
+.inpage-draft-box {
+  background-color: #121212;
+  border: 1px solid #383838;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.inpage-draft-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inpage-draft-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  background-color: #2a2a2a;
+  border: 1px solid #444444;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.inpage-draft-content {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #dddddd;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+  border-left: 2px solid #555555;
+  padding-left: 8px;
+}

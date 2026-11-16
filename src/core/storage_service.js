@@ -6,15 +6,17 @@
 const DEFAULT_SETTINGS = {
   provider: "gemini",
   apiKey: "",
-  model: "gemini-3.5-flash-lite",
+  model: "gemini-3.5-flash",
   academicStyle: "formal-id",
-  temperature: 0.2,
+  temperature: 0.35,
   autoCopyOnGenerate: true
 };
 
 function normalizeModel(model) {
-  if (!model || model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5") || model === "gemini-3.8-flash") {
-    return model && model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash-lite";
+  if (!model) return "gemini-3.5-flash";
+  // Normalize deprecated versions
+  if (model.includes("gemini-2.5") || model.includes("gemini-2.0") || model.includes("gemini-1.5")) {
+    return model.includes("pro") ? "gemini-3.8-pro" : "gemini-3.5-flash";
   }
   return model;
 }
