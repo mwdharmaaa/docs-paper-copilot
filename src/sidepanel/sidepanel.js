@@ -1,6 +1,7 @@
 /**
- * Ask Gemini for Google Docs - Side Panel Controller
- * Handles conversation flow, document selection context, and auto-typing dispatch.
+ * Docs Paper Copilot - Side Panel Controller
+ * Handles interactive discussions, multi-turn memory, and autonomous typing.
+ * Strictly zero emojis and pure monochrome workflow.
  */
 
 import { StorageService } from "../core/storage_service.js";
@@ -24,9 +25,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   const docTitleLabel = document.getElementById("doc-title-label");
   const pageProfileSummary = document.getElementById("page-profile-summary");
   const relearnSidepanelBtn = document.getElementById("btn-relearn-sidepanel");
+  const btnModeDiscuss = document.getElementById("btn-mode-discuss");
+  const btnModeWrite = document.getElementById("btn-mode-write");
 
+  let currentMode = "discuss"; // "discuss" | "write"
+  let conversationHistory = []; // Array of { role: "user" | "model", text: string }
   let currentSelectionContext = "";
   let currentPageProfile = null;
+
+  // Mode Navigation
+  function setMode(mode) {
+    currentMode = mode;
+    if (mode === "discuss") {
+      btnModeDiscuss.classList.add("active");
+      btnModeWrite.classList.remove("active");
+      promptInput.placeholder = "Ajak diskusi, tanya ide, atau minta saran penulisan...";
+      footerStatus.textContent = "Mode Diskusi aktif. GTyipe mengingat riwayat percakapan.";
+    } else {
+      btnModeWrite.classList.add("active");
+      btnModeDiscuss.classList.remove("active");
+      promptInput.placeholder = "Instruksikan draf yang ingin diketik ke dokumen...";
+      footerStatus.textContent = "Mode Tulis Langsung aktif. Fokus pada pembuatan draf dokumen.";
+    }
+  }
+
+  btnModeDiscuss.onclick = () => setMode("discuss");
+  btnModeWrite.onclick = () => setMode("write");
 
   // Load Settings
   const settings = await StorageService.getSettings();
@@ -53,7 +77,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (profile) {
       currentPageProfile = profile;
       if (pageProfileSummary) {
-        pageProfileSummary.textContent = profile.badgeText || `${profile.fontFamily} ${profile.fontSize} • ${profile.genreTag}`;
+        pageProfileSummary.textContent = profile.badgeText || `${profile.fontFamily} ${profile.fontSize} - ${profile.genreTag}`;
         pageProfileSummary.title = `Font: ${profile.fontFamily} (${profile.fontSize})\nSpasi: ${profile.lineSpacing}\nMargin: ${profile.margins}\nPerataan: ${profile.alignment}\nGaya: ${profile.writingStyle}`;
       }
     } else {
@@ -95,31 +119,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     selectionBar.style.display = "none";
   };
 
-  // Submit Prompt to Gemini
+  // Submit Prompt to Gemini (Multi-turn conversational or direct draft)
   async function submitPrompt(promptText) {
     if (!promptText || promptText.trim().length === 0) return;
     welcomeCard.style.display = "none";
 
+    const cleanPrompt = promptText.trim();
+
+    // Render User Message Bubble
     const userMsg = document.createElement("div");
     userMsg.className = "user-msg";
-    userMsg.textContent = promptText;
+    userMsg.textContent = cleanPrompt;
     messagesList.appendChild(userMsg);
     userMsg.scrollIntoView({ behavior: "smooth" });
 
     promptInput.value = "";
-    const formatLabel = currentPageProfile?.badgeText ? ` (${currentPageProfile.fontFamily}, ${currentPageProfile.genreTag})` : "";
-    footerStatus.textContent = `GTyipe sedang menulis draf sesuai format${formatLabel}...`;
+    const activeModeLabel = currentMode === "discuss" ? "Mendiskusikan" : "Menulis draf";
+    footerStatus.textContent = `GTyipe sedang memproses (${activeModeLabel})...`;
     sendBtn.disabled = true;
 
     try {
-      const responseText = await ActionHandlers.askGemini(promptText, currentSelectionContext, currentPageProfile);
+      const responseText = await ActionHandlers.askGemini({
+        prompt: cleanPrompt,
+        history: conversationHistory,
+        mode: currentMode,
+        selectedContext: currentSelectionContext,
+        pageProfile: currentPageProfile
+      });
+
+      // Update multi-turn session history
+      conversationHistory.push({ role: "user", text: cleanPrompt });
+      conversationHistory.push({ role: "model", text: responseText });
+
       const speed = parseInt(document.getElementById("setting-speed").value, 10) || 20;
       const card = renderGeminiCard(responseText, speed, (status) => {
         footerStatus.textContent = status;
-      });
+      }, currentMode);
+
       messagesList.appendChild(card);
       card.scrollIntoView({ behavior: "smooth" });
-      footerStatus.textContent = "Siap untuk instruksi berikutnya.";
+      footerStatus.textContent = currentMode === "discuss"
+        ? "Siap melanjutkan diskusi atau pilih 'Ketik Otomatis ke Docs'."
+        : "Draf siap. Klik 'Ketik Otomatis ke Docs' untuk mengetik ke halaman.";
     } catch (err) {
       footerStatus.textContent = `Error: ${err.message}`;
     } finally {
@@ -141,7 +182,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   clearChatBtn.onclick = () => {
+    conversationHistory = [];
     messagesList.innerHTML = "";
     welcomeCard.style.display = "flex";
+    footerStatus.textContent = "Riwayat percakapan dibersihkan.";
   };
 });

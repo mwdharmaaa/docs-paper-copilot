@@ -1,6 +1,6 @@
 /**
  * Docs Paper Copilot - Background Service Worker
- * Manages Gemini Docs orchestration and cross-context message routing.
+ * Manages GTyipe Docs orchestration, multi-turn discussions, and cross-context routing.
  */
 
 import { StorageService } from "./src/core/storage_service.js";
@@ -43,10 +43,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "EXECUTE_AGENT_PROMPT" || message.type === "ASK_GEMINI") {
     (async () => {
       try {
-        const { prompt, selectedContext, pageProfile } = message;
+        const { prompt, history = [], mode = "discuss", selectedContext = "", pageProfile = null } = message;
         const settings = await StorageService.getSettings();
-        const fullPrompt = PromptTemplates.askGemini(prompt, selectedContext, pageProfile);
-        const text = await AIClient.generate(settings, fullPrompt);
+        const text = await AIClient.generateChat(settings, {
+          prompt,
+          history,
+          mode,
+          selectedContext,
+          pageProfile
+        });
         sendResponse({ success: true, text });
       } catch (err) {
         sendResponse({ success: false, error: err.message });

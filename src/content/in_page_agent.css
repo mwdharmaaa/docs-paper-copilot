@@ -1,6 +1,7 @@
 /**
- * Ask Gemini for Google Docs - In-Page "Help Me Write" Styles
- * Google Workspace Material dark aesthetic, zero emojis, refined sparkle branding.
+ * Docs Paper Copilot - In-Page "Help Me Write" & Discussion Styles
+ * Google Workspace Material dark aesthetic.
+ * Strictly zero emojis and pure monochrome grayscale (black, white, gray).
  */
 
 #docs-gemini-agent-root {
@@ -9,7 +10,7 @@
   right: 28px;
   z-index: 2147483647;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #e3e3e3;
+  color: #f0f0f0;
   font-size: 13px;
   user-select: none;
 }
@@ -18,41 +19,42 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #1e1f20;
-  border: 1px solid #333538;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   padding: 8px 14px;
   border-radius: 9999px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   cursor: pointer;
   transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .gemini-floating-pill:hover {
-  background-color: #282a2c;
-  border-color: #8ab4f8;
+  background-color: #242424;
+  border-color: #555555;
   transform: translateY(-2px);
 }
 
 .gemini-pill-sparkle {
-  width: 18px;
-  height: 18px;
-  color: #a8c7fa;
+  width: 16px;
+  height: 16px;
+  color: #d4d4d4;
   flex-shrink: 0;
 }
 
 .gemini-pill-title {
-  font-weight: 500;
+  font-weight: 600;
   font-size: 12px;
   letter-spacing: -0.1px;
+  color: #f0f0f0;
 }
 
 .gemini-pill-shortcut {
-  background-color: #2b2d30;
-  color: #c4c7c5;
+  background-color: #262626;
+  color: #aaaaaa;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid #3c4043;
+  border: 1px solid #3c3c3c;
   font-family: monospace;
 }
 
@@ -60,15 +62,16 @@
   position: fixed;
   bottom: 76px;
   right: 28px;
-  width: 440px;
-  background-color: #1e1f20;
-  border: 1px solid #333538;
+  width: 460px;
+  max-height: 580px;
+  background-color: #161616;
+  border: 1px solid #333333;
   border-radius: 14px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65);
-  padding: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75);
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
 }
 
@@ -78,12 +81,68 @@
   justify-content: space-between;
 }
 
+.gemini-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gemini-header-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.gemini-modal-modes {
+  display: flex;
+  background-color: #222222;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.gemini-mode-btn {
+  background: transparent;
+  border: none;
+  color: #888888;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gemini-mode-btn:hover {
+  color: #cccccc;
+}
+
+.gemini-mode-btn.active {
+  background-color: #333333;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.gemini-btn-close {
+  background: transparent;
+  border: none;
+  color: #888888;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.gemini-btn-close:hover {
+  color: #f0f0f0;
+}
+
 /* Page Learner Card in In-Page Modal */
 .gemini-page-profile-card {
-  background-color: #161718;
-  border: 1px solid #2f3337;
+  background-color: #1c1c1c;
+  border: 1px solid #2e2e2e;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -93,157 +152,280 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  font-size: 11px;
 }
 
 .gemini-page-profile-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #a8c7fa;
+  font-weight: 500;
+  color: #888888;
 }
 
-.gemini-brain-icon {
-  width: 13px;
-  height: 13px;
-  color: #a8c7fa;
-  flex-shrink: 0;
+.gemini-profile-quick-label {
+  color: #cccccc;
+  font-weight: 600;
 }
 
 .gemini-btn-relearn {
   background: transparent;
-  border: 1px solid #3c4043;
-  color: #9aa0a6;
+  border: 1px solid #383838;
+  color: #999999;
   font-size: 10px;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .gemini-btn-relearn:hover {
-  background-color: #2b2d30;
-  color: #e3e3e3;
-  border-color: #8ab4f8;
+  background-color: #282828;
+  color: #ffffff;
+  border-color: #555555;
 }
 
 .gemini-profile-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .gemini-profile-tag {
   font-size: 10px;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
-  display: inline-flex;
-  align-items: center;
+  background-color: #222222;
+  color: #cccccc;
+  border: 1px solid #333333;
 }
 
-.gemini-profile-tag.font-tag {
-  background-color: rgba(138, 180, 248, 0.12);
-  color: #8ab4f8;
-  border: 1px solid rgba(138, 180, 248, 0.25);
+/* In-Page View Section */
+.inpage-view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
 }
 
-.gemini-profile-tag.spacing-tag {
-  background-color: rgba(197, 138, 249, 0.12);
-  color: #c58af9;
-  border: 1px solid rgba(197, 138, 249, 0.25);
+/* Discussion Feed */
+.inpage-chat-feed {
+  max-height: 240px;
+  min-height: 120px;
+  overflow-y: auto;
+  background-color: #121212;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.gemini-profile-tag.align-tag {
-  background-color: rgba(52, 168, 83, 0.12);
-  color: #81c995;
-  border: 1px solid rgba(52, 168, 83, 0.25);
+.inpage-empty-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  padding: 10px 4px;
 }
 
-.gemini-profile-tag.tone-tag {
-  background-color: rgba(251, 188, 4, 0.12);
-  color: #fdd663;
-  border: 1px solid rgba(251, 188, 4, 0.25);
+.inpage-empty-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cccccc;
 }
 
-.gemini-header-title {
+.inpage-empty-desc {
+  font-size: 11px;
+  color: #777777;
+  line-height: 1.4;
+}
+
+.inpage-chips-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.inpage-discuss-chip {
+  background-color: #1c1c1c;
+  border: 1px solid #333333;
+  color: #aaaaaa;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.inpage-discuss-chip:hover {
+  background-color: #282828;
+  color: #ffffff;
+  border-color: #555555;
+}
+
+.inpage-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inpage-msg-user {
+  align-self: flex-end;
+  background-color: #2b2b2b;
+  border: 1px solid #383838;
+  color: #f0f0f0;
+  padding: 6px 10px;
+  border-radius: 10px 10px 2px 10px;
+  font-size: 12px;
+  max-width: 85%;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.inpage-msg-assistant {
+  align-self: flex-start;
+  background-color: #1c1c1c;
+  border: 1px solid #333333;
+  color: #e5e5e5;
+  padding: 8px 10px;
+  border-radius: 10px 10px 10px 2px;
+  font-size: 12px;
+  width: 95%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.inpage-msg-content {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.inpage-msg-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e3e3e3;
+  gap: 6px;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 6px;
+  flex-wrap: wrap;
 }
 
-.gemini-btn-close {
+.inpage-msg-action-btn {
+  background-color: #242424;
+  border: 1px solid #333333;
+  color: #cccccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inpage-msg-action-btn:hover {
+  background-color: #303030;
+  color: #ffffff;
+  border-color: #555555;
+}
+
+.inpage-msg-action-btn.primary {
+  background-color: #e0e0e0;
+  color: #121212;
+  font-weight: 600;
+  border: none;
+}
+
+.inpage-msg-action-btn.primary:hover {
+  background-color: #ffffff;
+}
+
+.inpage-discuss-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inpage-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inpage-sub-btn {
   background: transparent;
   border: none;
-  color: #8e918f;
+  color: #777777;
+  font-size: 10px;
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
+  text-decoration: underline;
 }
-.gemini-btn-close:hover { color: #e3e3e3; }
 
+.inpage-sub-btn:hover {
+  color: #aaaaaa;
+}
+
+/* In-Page Text Inputs */
 .gemini-inpage-input {
   width: 100%;
-  background-color: #131314;
-  border: 1px solid #333538;
-  color: #e3e3e3;
+  background-color: #121212;
+  border: 1px solid #333333;
+  color: #f0f0f0;
   border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12px;
   resize: vertical;
-  min-height: 64px;
   outline: none;
   box-sizing: border-box;
   line-height: 1.4;
 }
 
 .gemini-inpage-input:focus {
-  border-color: #8ab4f8;
+  border-color: #555555;
 }
 
 .gemini-chips-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .gemini-chip {
-  background-color: #282a2c;
-  border: 1px solid #333538;
-  color: #c4c7c5;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  background-color: #222222;
+  border: 1px solid #333333;
+  color: #cccccc;
+  font-size: 10px;
+  padding: 4px 7px;
+  border-radius: 5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .gemini-chip:hover {
-  background-color: #333538;
-  color: #e3e3e3;
-  border-color: #8ab4f8;
+  background-color: #2c2c2c;
+  color: #ffffff;
+  border-color: #555555;
 }
 
 .gemini-inpage-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-end;
 }
 
 .gemini-btn-primary {
-  flex: 1;
-  background-color: #1a73e8;
-  color: #ffffff;
+  background-color: #e0e0e0;
+  color: #121212;
   border: none;
-  border-radius: 8px;
-  padding: 9px 14px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -252,32 +434,55 @@
   transition: background-color 0.15s ease;
 }
 
-.gemini-btn-primary:hover { background-color: #1b66c9; }
-.gemini-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.gemini-btn-primary:hover {
+  background-color: #ffffff;
+}
+
+.gemini-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .gemini-btn-stop {
-  background-color: #7f1d1d;
-  color: #fecaca;
-  border: 1px solid #991b1b;
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 12px;
+  background-color: #262626;
+  color: #cccccc;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
-.gemini-btn-stop:hover { background-color: #991b1b; }
+
+.gemini-btn-stop:hover {
+  background-color: #333333;
+  color: #ffffff;
+}
+
+.inpage-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 8px;
+  min-height: 22px;
+}
 
 .gemini-status-tag {
-  font-size: 11px;
-  color: #8e918f;
+  font-size: 10px;
+  color: #888888;
   display: flex;
   align-items: center;
   gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gemini-pulse-dot {
   width: 6px;
   height: 6px;
-  background-color: #8ab4f8;
+  background-color: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 8px #8ab4f8;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }

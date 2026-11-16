@@ -72,18 +72,35 @@ export const ActionHandlers = {
     }
   },
 
-  async askGemini(prompt, selectedContext = "", pageProfile = null) {
+  async askGemini(promptOrOpts, selectedContext = "", pageProfile = null) {
+    let payload = {};
+    if (typeof promptOrOpts === "object" && promptOrOpts !== null && promptOrOpts.prompt) {
+      payload = {
+        prompt: promptOrOpts.prompt,
+        history: promptOrOpts.history || [],
+        mode: promptOrOpts.mode || "discuss",
+        selectedContext: promptOrOpts.selectedContext || "",
+        pageProfile: promptOrOpts.pageProfile || null
+      };
+    } else {
+      payload = {
+        prompt: String(promptOrOpts || ""),
+        history: [],
+        mode: "discuss",
+        selectedContext: selectedContext || "",
+        pageProfile: pageProfile || null
+      };
+    }
+
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
         type: "ASK_GEMINI",
-        prompt,
-        selectedContext,
-        pageProfile
+        ...payload
       }, (res) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
         } else if (!res?.success) {
-          reject(new Error(res?.error || "Gagal memproses prompt Gemini."));
+          reject(new Error(res?.error || "Gagal memproses permintaan GTyipe."));
         } else {
           resolve(res.text);
         }
