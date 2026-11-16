@@ -386,6 +386,7 @@
       }, (res) => {
         sendDiscussBtn.disabled = false;
         if (chrome.runtime.lastError || !res?.success) {
+          inPageHistory.pop();
           const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";
           statusEl.textContent = `Error: ${rawErr}`;
           return;
