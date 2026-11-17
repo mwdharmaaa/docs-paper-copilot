@@ -86,24 +86,31 @@
       s = s.replace(/^[ \t]*###\s+(.*)$/gm, "[JUDUL_3] $1");
       s = s.replace(/^[ \t]*####\s+(.*)$/gm, "[JUDUL_4] $1");
 
-      // 2. Hapus markdown code block markers
+      // 2. PASTIKAN SETIAP JUDUL TERPISAH DUA BARIS DARI TEKS ISI:
+      // Mencegah judul dan kalimat pertama paragraf tergabung dalam satu blok,
+      // sehingga kalimat pertama paragraf DIJAMIN 100% menerima 1x Tab indent!
+      s = s.replace(/^(\[(?:JUDUL_\d|H\d|JUDUL_DOKUMEN|TITLE|SUBJUDUL)[^\]]*\].*?)\r?\n(?!\r?\n)/gim, "$1\n\n");
+      s = s.replace(/^(BAB\s+(?:[IVXLCDM]+|\d+).*?)\r?\n(?!\r?\n)/gim, "$1\n\n");
+      s = s.replace(/^(\d+\.\d+\.?\s+[A-Z].*?)\r?\n(?!\r?\n)/gm, "$1\n\n");
+
+      // 3. Hapus markdown code block markers
       s = s.replace(/^```[a-zA-Z]*\r?\n/gm, "");
       s = s.replace(/\r?\n```$/gm, "");
       s = s.replace(/```/g, "");
 
-      // 3. Hapus garis horizontal (---, ***, ___)
+      // 4. Hapus garis horizontal (---, ***, ___)
       s = s.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, "");
 
-      // 4. Bersihkan asterisk penanda tebal/miring dari teks Docs murni
+      // 5. Bersihkan asterisk penanda tebal/miring dari teks Docs murni
       s = s.replace(/\*{3}([^*]+)\*{3}/g, "$1");
       s = s.replace(/\*{2}([^*]+)\*{2}/g, "$1");
       s = s.replace(/\*([^*\r\n]+)\*/g, "$1");
       s = s.replace(/\*/g, "");
 
-      // 5. Hapus backtick
+      // 6. Hapus backtick
       s = s.replace(/`/g, "");
 
-      // 6. Normalisasi jarak baris berlebih
+      // 7. Normalisasi jarak baris berlebih
       s = s.replace(/(\r?\n){3,}/g, "\n\n");
 
       return s.trim();
@@ -171,6 +178,7 @@
 
     /**
      * Mengatur Ukuran Font Google Docs (16pt, 14pt, 12pt).
+     * Bekerja tangguh baik saat toolbar normal maupun menciut/collapsed ke tombol 'Lainnya'.
      */
     setFontSize(sizePt) {
       const pt = parseInt(sizePt, 10);
@@ -183,41 +191,80 @@
         "#fontSizeInputElement",
         "[aria-label*='Ukuran font'] input",
         "[aria-label*='Font size'] input",
-        ".docs-font-size-select input"
+        ".docs-font-size-select input",
+        "input.goog-toolbar-combo-button-input"
       ];
 
-      for (const sel of sizeSelectors) {
-        try {
-          const input = document.querySelector(sel);
-          if (input) {
-            const currentVal = parseInt(input.value || input.getAttribute("value"), 10);
-            if (currentVal === pt) return true;
+      function trySetInput(root = document) {
+        for (const sel of sizeSelectors) {
+          try {
+            const input = root.querySelector(sel);
+            if (input) {
+              const currentVal = parseInt(input.value || input.getAttribute("value"), 10);
+              if (currentVal === pt) return true;
 
-            input.focus();
-            input.value = String(pt);
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-            input.dispatchEvent(new KeyboardEvent("keydown", {
-              key: "Enter",
-              code: "Enter",
-              keyCode: 13,
-              which: 13,
-              bubbles: true,
-              cancelable: true
-            }));
-            input.dispatchEvent(new KeyboardEvent("keyup", {
-              key: "Enter",
-              code: "Enter",
-              keyCode: 13,
-              which: 13,
-              bubbles: true,
-              cancelable: true
-            }));
+              input.focus();
+              input.value = String(pt);
+              input.dispatchEvent(new Event("input", { bubbles: true }));
+              input.dispatchEvent(new Event("change", { bubbles: true }));
+              input.dispatchEvent(new KeyboardEvent("keydown", {
+                key: "Enter",
+                code: "Enter",
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+              }));
+              input.dispatchEvent(new KeyboardEvent("keyup", {
+                key: "Enter",
+                code: "Enter",
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
+              }));
+              return true;
+            }
+          } catch {}
+        }
+        return false;
+      }
+
+      // 1. Coba pencarian input langsung di toolbar
+      if (trySetInput(document)) {
+        this.focusEditor();
+        return true;
+      }
+
+      // 2. Buka menu overflow 'Lainnya' / 'More' jika toolbar Google Docs menciut
+      try {
+        const moreBtn =
+          document.getElementById("moreButton") ||
+          document.querySelector(".docs-toolbar-more-bubble") ||
+          document.querySelector("div[aria-label*='Lainnya']") ||
+          document.querySelector("div[aria-label*='More']") ||
+          document.querySelector("[id*='moreButton']");
+
+        if (moreBtn && typeof moreBtn.click === "function") {
+          moreBtn.click();
+          if (trySetInput(document)) {
             this.focusEditor();
             return true;
           }
-        } catch {}
-      }
+        }
+      } catch {}
+
+      // 3. Fallback: execCommand fontSize di iframe document (skala 1..7)
+      try {
+        const ifr = this.getEditorIframe();
+        if (ifr && ifr.contentDocument) {
+          const sizeMap = { 10: 1, 11: 2, 12: 3, 14: 4, 16: 5, 18: 6 };
+          const cmdVal = sizeMap[pt] || 3;
+          ifr.contentDocument.execCommand("fontSize", false, String(cmdVal));
+        }
+      } catch {}
+
+      this.focusEditor();
       return false;
     },
 
@@ -231,55 +278,93 @@
 
     /**
      * Terapkan Format Rata Kiri-Kanan (Justify Alignment: Ctrl+Shift+J).
+     * Bekerja tangguh bahkan jika toolbar Google Docs menciut/collapsed.
      */
     applyJustifyAlignment(target = null, iframe = null) {
       const tgt = target || this.getEditorTarget();
-      if (!tgt) return false;
+      const ifr = iframe || this.getEditorIframe();
 
-      try {
-        tgt.dispatchEvent(new KeyboardEvent("keydown", {
-          key: "J",
-          code: "KeyJ",
-          keyCode: 74,
-          which: 74,
-          ctrlKey: true,
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-
-        tgt.dispatchEvent(new KeyboardEvent("keyup", {
-          key: "J",
-          code: "KeyJ",
-          keyCode: 74,
-          which: 74,
-          ctrlKey: true,
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-      } catch (e) {
-        console.warn("[AutoTyper] Justify shortcut dispatch:", e);
+      // 1. Eksekusi perintah native justifyFull di contentDocument iframe
+      if (ifr && ifr.contentDocument) {
+        try {
+          ifr.contentDocument.execCommand("justifyFull", false, null);
+        } catch {}
       }
 
+      // 2. Dispatch shortcut Ctrl+Shift+J ke semua target aktif dokumen & window
+      const eventTargets = [
+        ifr?.contentWindow,
+        ifr?.contentDocument,
+        ifr?.contentDocument?.body,
+        tgt,
+        document.activeElement,
+        document.body,
+        window
+      ].filter(Boolean);
+
+      for (const t of eventTargets) {
+        try {
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "J",
+            code: "KeyJ",
+            keyCode: 74,
+            which: 74,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+
+          t.dispatchEvent(new KeyboardEvent("keyup", {
+            key: "J",
+            code: "KeyJ",
+            keyCode: 74,
+            which: 74,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+        } catch {}
+      }
+
+      // 3. Klik tombol Justify (baik di toolbar utama maupun menu overflow 'Lainnya' / 'More')
       try {
-        const justifyBtn =
+        let justifyBtn =
           document.getElementById("alignJustify") ||
           document.querySelector("[aria-label*='Rata kanan kiri']") ||
           document.querySelector("[aria-label*='Justify']") ||
           document.querySelector("[id*='alignJustify']") ||
           document.querySelector(".docs-icon-align-justify")?.closest("[role='button']");
 
-        if (justifyBtn) {
+        if (!justifyBtn) {
+          const moreBtn =
+            document.getElementById("moreButton") ||
+            document.querySelector(".docs-toolbar-more-bubble") ||
+            document.querySelector("div[aria-label*='Lainnya']") ||
+            document.querySelector("div[aria-label*='More']") ||
+            document.querySelector("[id*='moreButton']");
+
+          if (moreBtn && typeof moreBtn.click === "function") {
+            moreBtn.click();
+            justifyBtn =
+              document.getElementById("alignJustify") ||
+              document.querySelector("[aria-label*='Rata kanan kiri']") ||
+              document.querySelector("[aria-label*='Justify']");
+            if (justifyBtn && typeof justifyBtn.click === "function") {
+              justifyBtn.click();
+            }
+          }
+        } else if (typeof justifyBtn.click === "function") {
           const isChecked =
             justifyBtn.getAttribute("aria-pressed") === "true" ||
             justifyBtn.getAttribute("aria-checked") === "true" ||
             justifyBtn.classList.contains("goog-toolbar-button-checked") ||
             justifyBtn.classList.contains("docs-material-button-checked");
 
-          if (!isChecked && typeof justifyBtn.click === "function") {
+          if (!isChecked) {
             justifyBtn.click();
           }
         }
@@ -403,6 +488,78 @@
     },
 
     /**
+     * Memasukkan potongan teks/paragraf ke Google Docs secara atomik.
+     * Mencegah teks terpotong di tengah jalan saat terjadi perpindahan halaman (pagination).
+     */
+    insertTextChunk(chunk, target = null, iframe = null) {
+      if (!chunk || typeof chunk !== "string") return true;
+
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+      if (!tgt) return false;
+
+      let inserted = false;
+
+      // 1. Eksekusi insertText via contentDocument iframe Google Docs
+      if (ifr && ifr.contentDocument) {
+        try {
+          inserted = ifr.contentDocument.execCommand("insertText", false, chunk);
+        } catch {}
+      }
+
+      // 2. Dispatch event input (beforeinput & input)
+      try {
+        tgt.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: chunk,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        if (!inserted && ifr && ifr.contentDocument) {
+          try {
+            inserted = ifr.contentDocument.execCommand("insertText", false, chunk);
+          } catch {}
+        }
+
+        tgt.dispatchEvent(new InputEvent("input", {
+          inputType: "insertText",
+          data: chunk,
+          bubbles: true,
+          cancelable: false,
+          composed: true
+        }));
+      } catch {}
+
+      // 3. Fallback: ClipboardEvent DataTransfer paste jika execCommand gagal
+      if (!inserted) {
+        try {
+          const dt = new DataTransfer();
+          dt.setData("text/plain", chunk);
+          tgt.dispatchEvent(new ClipboardEvent("paste", {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+          inserted = true;
+        } catch {}
+      }
+
+      // 4. Secondary fallback: loop karakter jika cara atomik di atas belum terproses
+      if (!inserted) {
+        const chars = Array.from(chunk);
+        for (let i = 0; i < chars.length; i++) {
+          this.insertChar(chars[i], tgt, ifr);
+        }
+        inserted = true;
+      }
+
+      return inserted;
+    },
+
+    /**
      * Memasukkan Indentasi 1x Tab Resmi Skripsi (Visible First-Line Indent).
      * Menggunakan sequence 7 non-breaking spaces (\u00A0) dan event Tab (~1.27 cm).
      */
@@ -424,9 +581,7 @@
       } catch {}
 
       const tabSpaces = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0";
-      for (const ch of tabSpaces) {
-        this.insertChar(ch, tgt, ifr);
-      }
+      this.insertTextChunk(tabSpaces, tgt, ifr);
 
       try {
         tgt.dispatchEvent(new KeyboardEvent("keyup", {
@@ -673,7 +828,7 @@
       }
 
       // Terapkan default dokumen Rata Kanan-Kiri (Justify) dan ukuran 12 pt
-      this.applyJustifyAlignment(target, iframe);
+      this.applyJustifyAlignment();
       this.setFontSize(12);
 
       let inTocBlock = false;
@@ -685,6 +840,13 @@
           if (onCancel) onCancel();
           return false;
         }
+
+        // Re-focus dan ambil target editor mutakhir sebelum memproses alinea.
+        // Sangat krusial saat teks melintasi batas halaman (page break / pagination)
+        // di mana kanvas Docs mereposisi atau mendetach node target sebelumnya.
+        this.focusEditor();
+        let target = this.getEditorTarget();
+        let iframe = this.getEditorIframe();
 
         const p = paragraphs[i];
         const lines = p.split(/\r?\n/);
@@ -707,20 +869,34 @@
 
           if (hInfo.isHeading && hInfo.level > 0 && !isTocLine) {
             // ========================================================
-            // EKSEKUSI FORMAT JUDUL (Judul 1, Judul 2, Judul 3, dst.)
+            // EKSEKUSI FORMAT JUDUL:
             // - Judul Utama: 16 pt BOLD
             // - Judul Bab (BAB 1 / DAFTAR ISI): 14 pt BOLD
             // - Sub-judul (1.1): 12 pt BOLD
+            // - Sub-sub-judul (1.1.1): 12 pt BOLD
             // ========================================================
-            this.applyHeading(hInfo.level, target, iframe);
-            this.setFontSize(hInfo.fontSize || 14);
-            this.setBold(true, target, iframe);
-
-            const chars = Array.from(hInfo.text);
-            for (let c = 0; c < chars.length; c++) {
-              if (this.abortRequested) break;
-              this.insertChar(chars[c], target, iframe);
+            if (hInfo.level === 1 && hInfo.isDocTitle) {
+              this.applyHeading(1, target, iframe);
+              this.setFontSize(16);
+              this.setBold(true, target, iframe);
+            } else if (hInfo.level === 1) {
+              this.applyHeading(1, target, iframe);
+              this.setFontSize(14);
+              this.setBold(true, target, iframe);
+            } else if (hInfo.level === 2) {
+              // Sub-judul (1.1): Terapkan Teks Normal + BOLD 12pt
+              // agar ukuran font tidak membengkak ke 18pt bawaan Google Docs Heading 2
+              this.applyHeading(0, target, iframe);
+              this.setFontSize(12);
+              this.setBold(true, target, iframe);
+            } else {
+              // Sub-sub-judul (1.1.1): 12 pt BOLD
+              this.applyHeading(0, target, iframe);
+              this.setFontSize(12);
+              this.setBold(true, target, iframe);
             }
+
+            this.insertTextChunk(hInfo.text, target, iframe);
 
             if (l < lines.length - 1 || i < total - 1) {
               this.insertNewline(target, iframe);
@@ -747,11 +923,7 @@
             }
 
             const cleanTocText = rawLine.replace(/^\[(?:JUDUL_\d|H\d)\]\s*/i, "");
-            const chars = Array.from(cleanTocText);
-            for (let c = 0; c < chars.length; c++) {
-              if (this.abortRequested) break;
-              this.insertChar(chars[c], target, iframe);
-            }
+            this.insertTextChunk(cleanTocText, target, iframe);
 
             if (l < lines.length - 1) {
               this.insertNewline(target, iframe);
@@ -781,15 +953,9 @@
               this.insertTab(target, iframe);
             }
 
-            const chars = Array.from(textToType);
-            for (let c = 0; c < chars.length; c++) {
-              if (this.abortRequested) break;
-              this.insertChar(chars[c], target, iframe);
-
-              if (c > 0 && c % 120 === 0) {
-                await new Promise((res) => setTimeout(res, 0));
-              }
-            }
+            // Masukkan teks paragraf secara atomik/chunk
+            // Ini membuat pengetikan sangat cepat, tanpa risiko terpotong di tengah jalan!
+            this.insertTextChunk(textToType, target, iframe);
 
             if (l < lines.length - 1) {
               this.insertNewline(target, iframe);
@@ -811,7 +977,9 @@
         // Pemisahan alinea draf
         if (i < total - 1) {
           this.insertNewline(target, iframe);
-          this.insertNewline(target, iframe);
+          // Jeda singkat (45ms) agar kanvas Google Docs memiliki waktu melakukan
+          // reflow layout & pagination halaman baru tanpa mengabaikan input berikutnya
+          await new Promise((res) => setTimeout(res, 45));
         }
       }
 

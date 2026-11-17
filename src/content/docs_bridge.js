@@ -127,15 +127,22 @@
         }
 
         if (window.AutoTyper) {
-          window.AutoTyper.typeDraft(text, {
-            onComplete: () => {
-              showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
-            },
-            onError: (err) => {
-              showDocsNotification(err || "Gagal memasukkan draf ke dokumen.");
-            }
+          return new Promise((resolve) => {
+            window.AutoTyper.typeDraft(text, {
+              onComplete: () => {
+                showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
+                resolve({ success: true, completed: true });
+              },
+              onError: (err) => {
+                showDocsNotification(err || "Gagal memasukkan draf ke dokumen.");
+                resolve({ success: false, error: err });
+              },
+              onCancel: () => {
+                showDocsNotification("Penulisan draf dihentikan.");
+                resolve({ success: false, cancelled: true });
+              }
+            });
           });
-          return { success: true, started: true };
         } else {
           const cleanText = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
             ? window.AutoTyper.cleanMarkdownForDocs(text)
