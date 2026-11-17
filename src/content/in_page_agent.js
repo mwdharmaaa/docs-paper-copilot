@@ -1,32 +1,91 @@
 /**
- * Docs Paper Copilot - In-Page "Help Me Write" & Discussion Agent
- * Renders the in-document GTyipe widget with scholar-grade discussions,
- * multi-turn conversation memory, and streaming automated typing into Google Docs.
- * Strictly zero emojis and pure monochrome styling.
+ * Docs Paper Copilot - Gemini Web Experience in Google Docs
+ * Embedded wide-screen Gemini Web interface with left-corner dock navigation,
+ * multi-turn conversation memory, academic markdown rendering, and
+ * autonomous typing into Google Docs complying with strict typography protocols.
+ * Zero emojis, pure monochrome & Gemini Dark theme.
  */
 
-(function initGeminiInPageAgent() {
+(function initGeminiWebExtension() {
   if (window.__docsGeminiAgentInitialized) return;
   window.__docsGeminiAgentInitialized = true;
 
+  // ==========================================================================
+  // Helper: Escape HTML & Render Markdown
+  // ==========================================================================
+  function escapeHtml(str) {
+    if (!str || typeof str !== "string") return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function renderMarkdown(text) {
+    if (!text || typeof text !== "string") return "";
+    let safe = escapeHtml(text);
+
+    // Code blocks: ```code```
+    safe = safe.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gi, (m, lang, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    });
+
+    // Inline code: `code`
+    safe = safe.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+    // Headings: ###, ##, #
+    safe = safe.replace(/^### (.*$)/gim, "<h3>$1</h3>");
+    safe = safe.replace(/^## (.*$)/gim, "<h2>$1</h2>");
+    safe = safe.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+
+    // Bold: **text** or __text__
+    safe = safe.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    safe = safe.replace(/__(.*?)__/g, "<strong>$1</strong>");
+
+    // Italic: *text* or _text_
+    safe = safe.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    safe = safe.replace(/_([^_]+)_/g, "<em>$1</em>");
+
+    // Blockquotes: > text
+    safe = safe.replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>");
+
+    // Unordered lists
+    safe = safe.replace(/^\s*[\*\-]\s+(.*$)/gim, "<li>$1</li>");
+    safe = safe.replace(/(<li>[\s\S]*?<\/li>)/gi, "<ul>$1</ul>");
+    safe = safe.replace(/<\/ul>\s*<ul>/g, "");
+
+    // Split paragraphs
+    const paras = safe.split(/\n{2,}/);
+    return paras.map(p => {
+      p = p.trim();
+      if (!p) return "";
+      if (p.startsWith("<h1>") || p.startsWith("<h2>") || p.startsWith("<h3>") ||
+          p.startsWith("<ul>") || p.startsWith("<pre>") || p.startsWith("<blockquote>")) {
+        return p;
+      }
+      return `<p>${p.replace(/\n/g, "<br>")}</p>`;
+    }).join("\n");
+  }
+
+  // ==========================================================================
+  // Helper: Parse AI Response for Discussion vs Clean Draft
+  // ==========================================================================
   function parseResponseDraft(rawText) {
     if (!rawText || typeof rawText !== "string") {
       return { discussionText: "", draftText: "", hasDraft: false };
     }
 
-    // 1. Pencocokan tag draf lengkap (fleksibel kurung sudut dan spasi)
+    // 1. Tag draf lengkap
     const fullMatch = rawText.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}([\s\S]*?)<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
     if (fullMatch) {
       const draftText = fullMatch[1].trim();
       const discussionText = rawText.replace(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}[\s\S]*?<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i, "").trim();
-      return {
-        discussionText,
-        draftText,
-        hasDraft: true
-      };
+      return { discussionText, draftText, hasDraft: true };
     }
 
-    // 2. Jika hanya tag penutup yang muncul
+    // 2. Tag penutup saja
     const closeMatch = rawText.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
     if (closeMatch) {
       const before = rawText.substring(0, closeMatch.index).trim();
@@ -37,20 +96,12 @@
         const discHead = before.substring(0, splitIdx).trim();
         const draft = before.substring(splitIdx).trim();
         const discussionText = (discHead ? discHead + "\n\n" : "") + after;
-        return {
-          discussionText: discussionText.trim(),
-          draftText: draft,
-          hasDraft: true
-        };
+        return { discussionText: discussionText.trim(), draftText: draft, hasDraft: true };
       }
-      return {
-        discussionText: after,
-        draftText: before,
-        hasDraft: true
-      };
+      return { discussionText: after, draftText: before, hasDraft: true };
     }
 
-    // 3. Fallback tanpa tag: Pisahkan sapaan obrolan di awal jika naskah berisi judul akademik
+    // 3. Header akademis natural (BAB 1 / DAFTAR ISI)
     const headingMatch = rawText.match(/(?:^|\n\n)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
     if (headingMatch && headingMatch.index !== undefined && headingMatch.index > 0) {
       const splitIdx = headingMatch.index + 2;
@@ -64,257 +115,24 @@
         draft = draft.substring(0, trailMatch.index).trim();
       }
       const discussionText = (discHead ? discHead + "\n\n" : "") + discTail;
-      return {
-        discussionText: discussionText.trim(),
-        draftText: draft,
-        hasDraft: true
-      };
+      return { discussionText: discussionText.trim(), draftText: draft, hasDraft: true };
     }
 
-    return {
-      discussionText: rawText.trim(),
-      draftText: rawText.trim(),
-      hasDraft: false
-    };
+    return { discussionText: rawText.trim(), draftText: rawText.trim(), hasDraft: false };
   }
 
-  function escapeHtml(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  const root = document.createElement("div");
-  root.id = "docs-gemini-agent-root";
-  root.innerHTML = `
-    <div id="gemini-pill" class="gemini-floating-pill" title="Buka GTyipe (Alt+G)">
-      <svg class="gemini-pill-sparkle" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
-      </svg>
-      <span class="gemini-pill-title">GTyipe</span>
-      <span class="gemini-pill-shortcut">Alt+G</span>
-    </div>
-
-    <div id="gemini-modal" class="gemini-inpage-modal" style="display: none;">
-      <!-- Header -->
-      <div class="gemini-modal-header">
-        <div class="gemini-header-left">
-          <svg class="gemini-pill-sparkle" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-            <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
-          </svg>
-          <span class="gemini-header-title-text">GTyipe</span>
-        </div>
-
-        <div class="gemini-modal-modes">
-          <button type="button" class="gemini-mode-btn active" id="inpage-mode-discuss">Diskusi</button>
-          <button type="button" class="gemini-mode-btn" id="inpage-mode-write">Tulis Langsung</button>
-        </div>
-
-        <button id="gemini-close-btn" class="gemini-btn-close" title="Tutup">&times;</button>
-      </div>
-
-      <!-- Page Profile Tags Card -->
-      <div id="gemini-page-profile-card" class="gemini-page-profile-card">
-        <div class="gemini-page-profile-header">
-          <div class="gemini-page-profile-title">
-            <span>Format Halaman:</span>
-            <span id="gemini-profile-quick-label" class="gemini-profile-quick-label">Memindai...</span>
-          </div>
-          <button type="button" id="gemini-btn-relearn" class="gemini-btn-relearn" title="Pelajari ulang format halaman">Pelajari Ulang</button>
-        </div>
-        <div id="gemini-profile-tags" class="gemini-profile-tags">
-          <span class="gemini-profile-tag font-tag" id="tag-font">Font...</span>
-          <span class="gemini-profile-tag spacing-tag" id="tag-spacing">Spasi...</span>
-          <span class="gemini-profile-tag align-tag" id="tag-align">Perataan...</span>
-          <span class="gemini-profile-tag tone-tag" id="tag-tone">Gaya...</span>
-        </div>
-      </div>
-
-      <!-- View: Diskusi & Konsultasi -->
-      <div id="inpage-view-discuss" class="inpage-view-section">
-        <div id="inpage-chat-feed" class="inpage-chat-feed">
-          <div id="inpage-discuss-empty" class="inpage-empty-box">
-            <div class="inpage-empty-title">Mitra Diskusi Dokumen</div>
-            <div class="inpage-empty-desc">Tanyakan ide, minta review teks seleksi, kritik argumen, atau susun draf bersama.</div>
-            <div class="inpage-chips-grid">
-              <button type="button" class="inpage-discuss-chip" data-cmd="Review teks seleksi dan berikan kritik konstruktif">Review teks seleksi</button>
-              <button type="button" class="inpage-discuss-chip" data-cmd="Bantu susun outline dan kerangka bahasan berikutnya">Bantu susun outline</button>
-              <button type="button" class="inpage-discuss-chip" data-cmd="Kritisi argumen pada bagian ini dan cari celah logikanya">Kritisi argumen</button>
-              <button type="button" class="inpage-discuss-chip" data-cmd="Berikan 2 alternatif formulasi kalimat yang lebih berbobot">Alternatif kalimat</button>
-            </div>
-          </div>
-          <div id="inpage-messages-list" class="inpage-messages-list"></div>
-        </div>
-
-        <div class="inpage-discuss-input-row">
-          <textarea id="inpage-discuss-input" class="gemini-inpage-input" rows="2" placeholder="Tanya ide, minta kritik tulisan, atau instruksikan draf..."></textarea>
-          <div class="inpage-input-actions">
-            <div class="inpage-input-left">
-              <button type="button" id="inpage-btn-clear-chat" class="inpage-sub-btn">Bersihkan Chat</button>
-            </div>
-            <button type="button" id="inpage-btn-send-discuss" class="gemini-btn-primary">Kirim</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- View: Tulis Langsung (Direct Drafter) -->
-      <div id="inpage-view-write" class="inpage-view-section" style="display: none;">
-        <textarea id="gemini-prompt" class="gemini-inpage-input" rows="3" placeholder="Tulis instruksi draf yang ingin langsung diketik ke dalam dokumen..."></textarea>
-
-        <div class="gemini-chips-row">
-          <button type="button" class="gemini-chip" data-cmd="Tulis draf pembuka tentang dampak kecerdasan buatan">Draf Pembuka</button>
-          <button type="button" class="gemini-chip" data-cmd="Lanjutkan kalimat ini dengan argumen ilmiah yang kohesif">Lanjutkan Teks</button>
-          <button type="button" class="gemini-chip" data-cmd="Perbaiki ejaan, salah ketik, dan tata bahasa PUEBI">Koreksi PUEBI</button>
-          <button type="button" class="gemini-chip" data-cmd="Parafrase paragraf ini menggunakan sudut pandang pasif objektif">Parafrase Formal</button>
-        </div>
-
-        <div class="gemini-inpage-actions">
-          <button type="button" id="gemini-run-btn" class="gemini-btn-primary">
-            <span>Ketik Otomatis ke Docs</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Bottom Global Status Bar -->
-      <div class="inpage-status-bar">
-        <div id="gemini-status" class="gemini-status-tag">Siap mendiskusikan atau mengetik dokumen.</div>
-        <button id="gemini-stop-btn" class="gemini-btn-stop" style="display: none;">Hentikan Pengetikan</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(root);
-
-  const pill = document.getElementById("gemini-pill");
-  const modal = document.getElementById("gemini-modal");
-  const closeBtn = document.getElementById("gemini-close-btn");
-  const statusEl = document.getElementById("gemini-status");
-  const stopBtn = document.getElementById("gemini-stop-btn");
-
-  const modeDiscussBtn = document.getElementById("inpage-mode-discuss");
-  const modeWriteBtn = document.getElementById("inpage-mode-write");
-  const viewDiscuss = document.getElementById("inpage-view-discuss");
-  const viewWrite = document.getElementById("inpage-view-write");
-
-  const discussInput = document.getElementById("inpage-discuss-input");
-  const sendDiscussBtn = document.getElementById("inpage-btn-send-discuss");
-  const clearChatBtn = document.getElementById("inpage-btn-clear-chat");
-  const inpageMessagesList = document.getElementById("inpage-messages-list");
-  const inpageDiscussEmpty = document.getElementById("inpage-discuss-empty");
-
-  const promptInput = document.getElementById("gemini-prompt");
-  const runBtn = document.getElementById("gemini-run-btn");
-  const writeChips = document.querySelectorAll(".gemini-chip");
-  const discussChips = document.querySelectorAll(".inpage-discuss-chip");
-
-  const tagFont = document.getElementById("tag-font");
-  const tagSpacing = document.getElementById("tag-spacing");
-  const tagAlign = document.getElementById("tag-align");
-  const tagTone = document.getElementById("tag-tone");
-  const quickProfileLabel = document.getElementById("gemini-profile-quick-label");
-  const relearnBtn = document.getElementById("gemini-btn-relearn");
-
-  let activePageProfile = null;
-  let activeInPageMode = "discuss"; // "discuss" | "write"
-  let inPageHistory = []; // [{ role: "user" | "model", text: string }]
-
-  // Mode Switching
-  function switchInPageMode(mode) {
-    activeInPageMode = mode;
-    if (mode === "discuss") {
-      modeDiscussBtn.classList.add("active");
-      modeWriteBtn.classList.remove("active");
-      viewDiscuss.style.display = "flex";
-      viewWrite.style.display = "none";
-      statusEl.textContent = "Mode Diskusi aktif. Riwayat percakapan tersimpan.";
-      setTimeout(() => discussInput.focus(), 50);
-    } else {
-      modeWriteBtn.classList.add("active");
-      modeDiscussBtn.classList.remove("active");
-      viewDiscuss.style.display = "none";
-      viewWrite.style.display = "flex";
-      statusEl.textContent = "Mode Tulis Langsung aktif. Siap ngetik ke dokumen.";
-      setTimeout(() => promptInput.focus(), 50);
+  // ==========================================================================
+  // Document Context Extraction
+  // ==========================================================================
+  function getDocTitle() {
+    const titleInput = document.querySelector(".docs-title-input") || document.querySelector("#docs-title-widget input");
+    if (titleInput && titleInput.value && titleInput.value.trim()) {
+      return titleInput.value.trim();
     }
+    const rawTitle = document.title || "";
+    const cleaned = rawTitle.replace(/\s*-\s*Google (?:Dokumen|Docs).*$/i, "").trim();
+    return cleaned || "Dokumen Google Docs";
   }
-
-  modeDiscussBtn.onclick = () => switchInPageMode("discuss");
-  modeWriteBtn.onclick = () => switchInPageMode("write");
-
-  function updateLearnedPageProfile(forceRefresh = false) {
-    if (window.PageLearner) {
-      activePageProfile = forceRefresh ? window.PageLearner.learnPage() : window.PageLearner.getProfile();
-      if (activePageProfile) {
-        if (quickProfileLabel) {
-          quickProfileLabel.textContent = `${activePageProfile.fontFamily} ${activePageProfile.fontSize}`;
-        }
-        if (tagFont) {
-          tagFont.textContent = `${activePageProfile.fontFamily} ${activePageProfile.fontSize}`;
-          tagFont.title = `Font: ${activePageProfile.fontFamily} (${activePageProfile.fontSize})`;
-        }
-        if (tagSpacing) {
-          tagSpacing.textContent = `Spasi ${activePageProfile.lineSpacing.split(" ")[0]}`;
-          tagSpacing.title = `Jarak Baris: ${activePageProfile.lineSpacing}`;
-        }
-        if (tagAlign) {
-          tagAlign.textContent = activePageProfile.alignment.includes("Justify") ? "Justify" : "Rata Kiri";
-          tagAlign.title = `Perataan: ${activePageProfile.alignment}`;
-        }
-        if (tagTone) {
-          tagTone.textContent = activePageProfile.genreTag || "Dokumen Formal";
-          tagTone.title = `Gaya: ${activePageProfile.writingStyle}\nMargin: ${activePageProfile.margins}`;
-        }
-      }
-    }
-  }
-
-  if (relearnBtn) {
-    relearnBtn.onclick = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      statusEl.textContent = "Menyelaraskan format dokumen ke standar 12pt...";
-      if (window.AutoTyper && typeof window.AutoTyper.calibrateTo12 === "function") {
-        await window.AutoTyper.calibrateTo12();
-      }
-      updateLearnedPageProfile(true);
-      statusEl.textContent = "Format halaman berhasil diselaraskan ke standar baku (12 pt).";
-    };
-  }
-
-  function toggleModal(show) {
-    const isVisible = show !== undefined ? show : modal.style.display === "none";
-    modal.style.display = isVisible ? "flex" : "none";
-    if (isVisible) {
-      updateLearnedPageProfile(false);
-      if (activeInPageMode === "discuss") {
-        setTimeout(() => discussInput.focus(), 50);
-      } else {
-        setTimeout(() => promptInput.focus(), 50);
-      }
-    }
-  }
-
-  pill.onclick = () => toggleModal();
-  closeBtn.onclick = () => toggleModal(false);
-
-  window.addEventListener("keydown", (e) => {
-    if ((e.altKey && (e.key === "g" || e.key === "G" || e.key === "k" || e.key === "K"))) {
-      e.preventDefault();
-      toggleModal();
-    }
-  });
-
-  writeChips.forEach((chip) => {
-    chip.onclick = () => {
-      promptInput.value = chip.dataset.cmd;
-      promptInput.focus();
-    };
-  });
-
-  discussChips.forEach((chip) => {
-    chip.onclick = () => {
-      discussInput.value = chip.dataset.cmd;
-      submitDiscussTurn();
-    };
-  });
 
   function getSelectedDocText() {
     try {
@@ -327,263 +145,641 @@
     return window.getSelection()?.toString().trim() || "";
   }
 
-  // Protokol Pengetikan Resmi: Langsung Selesai Satu Draf (Instant Whole Draft)
-  // PERINGATAN: DILARANG MENGUBAH PROTOKOL INI PADA UPDATE APAPUN DI MASA DEPAN.
+  // ==========================================================================
+  // DOM Mount: Left-Corner Dock & Wide Gemini Web Overlay
+  // ==========================================================================
+  const root = document.createElement("div");
+  root.id = "docs-gemini-agent-root";
+  root.innerHTML = `
+    <!-- Left-Corner Dock Navigation (GType / Gemini) -->
+    <div id="gemini-dock-nav" class="gemini-dock-nav" title="Buka Gemini Docs (Alt+G)">
+      <svg class="gemini-dock-sparkle" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+      </svg>
+      <span class="gemini-dock-title">Gemini</span>
+      <span id="gemini-dock-status" class="gemini-dock-status-text">Memasukkan draf...</span>
+      <span class="gemini-dock-shortcut">Alt+G</span>
+    </div>
+
+    <!-- Wide Gemini Web Overlay -->
+    <div id="gemini-wide-overlay" class="gemini-wide-overlay" style="display: none;">
+      <div id="gemini-wide-backdrop" class="gemini-wide-backdrop"></div>
+      
+      <div id="gemini-wide-window" class="gemini-wide-window mode-wide">
+        <!-- Header Bar -->
+        <div class="gemini-window-header">
+          <div class="gemini-header-left">
+            <button type="button" id="gemini-toggle-sidebar" class="gemini-icon-btn" title="Buka/Tutup Sidebar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div class="gemini-brand-badge">
+              <svg class="gemini-brand-sparkle" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+              </svg>
+              <span class="gemini-brand-title">Gemini</span>
+              <span class="gemini-model-badge">Gemini 2.5 Pro</span>
+            </div>
+          </div>
+
+          <div class="gemini-header-center">
+            <span id="gemini-doc-meta-title" class="gemini-doc-meta-title">Dokumen Google Docs</span>
+            <span id="gemini-page-format-chip" class="gemini-page-format-chip">Arial 12pt • Justify</span>
+          </div>
+
+          <div class="gemini-header-right">
+            <button type="button" id="gemini-btn-split" class="gemini-icon-btn" title="Mode Layar Terpisah / Penuh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="12" y1="3" x2="12" y2="21"></line>
+              </svg>
+            </button>
+            <button type="button" id="gemini-btn-minimize" class="gemini-icon-btn" title="Perkecil ke Dock (Esc)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+            <button type="button" id="gemini-btn-close" class="gemini-icon-btn danger" title="Tutup Window">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Window Body: Sidebar + Main Canvas -->
+        <div class="gemini-window-body">
+          <!-- Collapsible Sidebar -->
+          <div id="gemini-sidebar" class="gemini-sidebar">
+            <button type="button" id="gemini-new-chat" class="gemini-new-chat-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>+ Chat Baru</span>
+            </button>
+
+            <div class="gemini-sidebar-section-title">Format Dokumen</div>
+            <div class="gemini-page-format-card">
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Font</span>
+                <span id="gemini-sidebar-font" class="gemini-format-val">Memindai...</span>
+              </div>
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Spasi</span>
+                <span id="gemini-sidebar-spacing" class="gemini-format-val">1.5 spasi</span>
+              </div>
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Perataan</span>
+                <span id="gemini-sidebar-align" class="gemini-format-val">Justify</span>
+              </div>
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Gaya</span>
+                <span id="gemini-sidebar-tone" class="gemini-format-val">Skripsi Formal</span>
+              </div>
+              <button type="button" id="gemini-relearn-btn" class="gemini-relearn-btn" title="Kalibrasi ulang font ke standar baku 12pt">
+                Kalibrasi Baku 12pt
+              </button>
+            </div>
+
+            <div class="gemini-sidebar-section-title">Riwayat Sesi</div>
+            <div id="gemini-history-list" class="gemini-history-list"></div>
+
+            <div class="gemini-sidebar-footer">
+              <button type="button" id="gemini-clear-chat" class="gemini-clear-btn">Bersihkan Percakapan</button>
+            </div>
+          </div>
+
+          <!-- Center Main Chat Area -->
+          <div class="gemini-chat-area">
+            <div id="gemini-chat-scroll" class="gemini-chat-scroll">
+              <!-- Welcome State (Real Gemini Web Layout) -->
+              <div id="gemini-welcome-container" class="gemini-welcome-container">
+                <div class="gemini-welcome-heading">
+                  <div class="gemini-welcome-hello">Halo,</div>
+                  <div class="gemini-welcome-subtitle">Ada yang bisa kubantu tulis hari ini?</div>
+                </div>
+                <div class="gemini-cards-grid">
+                  <div class="gemini-prompt-card" data-prompt="Tuliskan Bab 1 Pendahuluan lengkap dengan latar belakang masalah 4 alinea deduktif, identifikasi masalah, rumusan masalah, dan tujuan penelitian berbobot akademik tinggi">
+                    <div class="gemini-card-header">Buat Bab 1 Pendahuluan</div>
+                    <div class="gemini-card-desc">Susun latar belakang 4 alinea deduktif, rumusan masalah, dan tujuan penelitian formal.</div>
+                  </div>
+                  <div class="gemini-prompt-card" data-prompt="Review teks yang sedang saya pilih di dokumen, analisis celah argumennya, dan berikan revisi yang lebih tajam dan akademis">
+                    <div class="gemini-card-header">Review & Koreksi Tulisan</div>
+                    <div class="gemini-card-desc">Kritisi alur logika, periksa kesesuaian PUEBI, dan perbaiki formulasi kalimat.</div>
+                  </div>
+                  <div class="gemini-prompt-card" data-prompt="Bantu susun outline dan kerangka penelitian yang komprehensif mulai dari Bab 1 hingga Bab 5">
+                    <div class="gemini-card-header">Susun Outline Penelitian</div>
+                    <div class="gemini-card-desc">Rancang kerangka bab dari Bab 1 sampai Bab 5 secara sistematis.</div>
+                  </div>
+                  <div class="gemini-prompt-card" data-prompt="Parafrase kalimat/paragraf ini menjadi gaya bahasa akademik formal dengan sudut pandang pasif objektif dan bernas">
+                    <div class="gemini-card-header">Parafrase Akademik Formal</div>
+                    <div class="gemini-card-desc">Ubah register bahasa agar bernas, ilmiah, dan bebas dari redundansi kata.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Message Stream -->
+              <div id="gemini-messages-list" class="gemini-messages-list"></div>
+            </div>
+
+            <!-- Bottom Floating Prompt Bar -->
+            <div class="gemini-prompt-bar-area">
+              <div class="gemini-quick-chips-row">
+                <button type="button" class="gemini-chip-btn" data-prompt="Tuliskan draf pembuka tentang urgensi topik ini">Draf Pembuka</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Lanjutkan paragraf ini dengan argumen ilmiah dan landasan teori yang kuat">Lanjutkan Naskah</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Koreksi salah ketik, tanda baca, dan tata bahasa PUEBI pada teks ini">Koreksi PUEBI</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Parafrase bagian ini menggunakan sudut pandang pasif formal">Parafrase Formal</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Susun Daftar Isi lengkap dengan perataan dot leaders dan nomor halaman tanpa indentasi tab">Daftar Isi Rapi</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Kritisi argumen pada bagian ini dan temukan kelemahan logikanya">Kritik Argumen</button>
+              </div>
+
+              <div class="gemini-input-card">
+                <textarea id="gemini-textarea-input" class="gemini-textarea-input" rows="1" placeholder="Tanya apa saja, minta draf bab, revisi, atau ide penelitian..."></textarea>
+                <div class="gemini-input-bottom-bar">
+                  <div class="gemini-input-status-indicator">
+                    <span class="gemini-pulse-dot"></span>
+                    <span id="gemini-status-text">Siap membantu penulisan dokumen</span>
+                  </div>
+                  <button type="button" id="gemini-send-btn" class="gemini-send-button" title="Kirim Prompt (Enter)">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(root);
+
+  // ==========================================================================
+  // Element References
+  // ==========================================================================
+  const dockNav = document.getElementById("gemini-dock-nav");
+  const dockStatus = document.getElementById("gemini-dock-status");
+  const overlay = document.getElementById("gemini-wide-overlay");
+  const backdrop = document.getElementById("gemini-wide-backdrop");
+  const windowEl = document.getElementById("gemini-wide-window");
+
+  const btnClose = document.getElementById("gemini-btn-close");
+  const btnMinimize = document.getElementById("gemini-btn-minimize");
+  const btnSplit = document.getElementById("gemini-btn-split");
+  const btnToggleSidebar = document.getElementById("gemini-toggle-sidebar");
+  const sidebar = document.getElementById("gemini-sidebar");
+
+  const docMetaTitle = document.getElementById("gemini-doc-meta-title");
+  const headerFormatChip = document.getElementById("gemini-page-format-chip");
+  const sidebarFont = document.getElementById("gemini-sidebar-font");
+  const sidebarSpacing = document.getElementById("gemini-sidebar-spacing");
+  const sidebarAlign = document.getElementById("gemini-sidebar-align");
+  const sidebarTone = document.getElementById("gemini-sidebar-tone");
+  const btnRelearn = document.getElementById("gemini-relearn-btn");
+
+  const btnNewChat = document.getElementById("gemini-new-chat");
+  const btnClearChat = document.getElementById("gemini-clear-chat");
+  const historyList = document.getElementById("gemini-history-list");
+
+  const chatScroll = document.getElementById("gemini-chat-scroll");
+  const welcomeContainer = document.getElementById("gemini-welcome-container");
+  const messagesList = document.getElementById("gemini-messages-list");
+
+  const textareaInput = document.getElementById("gemini-textarea-input");
+  const sendBtn = document.getElementById("gemini-send-btn");
+  const statusText = document.getElementById("gemini-status-text");
+
+  // ==========================================================================
+  // State Management
+  // ==========================================================================
+  let isWindowOpen = false;
+  let isSplitMode = false;
+  let activePageProfile = null;
+  let chatHistory = []; // [{ role: "user" | "model", text: string }]
+  let recentPrompts = [];
+  let isTypingInProgress = false;
+
+  // ==========================================================================
+  // Auto-resize Textarea
+  // ==========================================================================
+  function autoResizeTextarea() {
+    textareaInput.style.height = "auto";
+    const nextH = Math.min(textareaInput.scrollHeight, 180);
+    textareaInput.style.height = `${nextH}px`;
+  }
+  textareaInput.addEventListener("input", autoResizeTextarea);
+
+  // ==========================================================================
+  // Window Toggle & Modes
+  // ==========================================================================
+  function setWindowVisible(visible) {
+    isWindowOpen = visible;
+    if (visible) {
+      overlay.style.display = "flex";
+      updateHeaderDocInfo();
+      updateLearnedPageProfile(false);
+      setTimeout(() => {
+        textareaInput.focus();
+        autoResizeTextarea();
+      }, 60);
+    } else {
+      overlay.style.display = "none";
+    }
+  }
+
+  function toggleWindow() {
+    setWindowVisible(!isWindowOpen);
+  }
+
+  dockNav.onclick = () => toggleWindow();
+  backdrop.onclick = () => setWindowVisible(false);
+  btnClose.onclick = () => setWindowVisible(false);
+  btnMinimize.onclick = () => setWindowVisible(false);
+
+  // Split View Mode (50% left Gemini, 50% right Google Docs)
+  btnSplit.onclick = () => {
+    isSplitMode = !isSplitMode;
+    if (isSplitMode) {
+      windowEl.classList.remove("mode-wide");
+      windowEl.classList.add("mode-split");
+      btnSplit.title = "Mode Layar Penuh (Wide View)";
+    } else {
+      windowEl.classList.remove("mode-split");
+      windowEl.classList.add("mode-wide");
+      btnSplit.title = "Mode Layar Terpisah (Split View)";
+    }
+  };
+
+  // Toggle Sidebar
+  btnToggleSidebar.onclick = () => {
+    sidebar.classList.toggle("collapsed");
+  };
+
+  // Global Shortcuts: Alt+G to toggle, Escape to close
+  window.addEventListener("keydown", (e) => {
+    if (e.altKey && (e.key === "g" || e.key === "G" || e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      toggleWindow();
+      return;
+    }
+    if (e.key === "Escape" && isWindowOpen) {
+      e.preventDefault();
+      setWindowVisible(false);
+    }
+  });
+
+  // ==========================================================================
+  // Update Profile & Document Header
+  // ==========================================================================
+  function updateHeaderDocInfo() {
+    if (docMetaTitle) {
+      docMetaTitle.textContent = getDocTitle();
+      docMetaTitle.title = docMetaTitle.textContent;
+    }
+  }
+
+  function updateLearnedPageProfile(forceRefresh = false) {
+    if (window.PageLearner) {
+      activePageProfile = forceRefresh ? window.PageLearner.learnPage() : window.PageLearner.getProfile();
+      if (activePageProfile) {
+        const fontDesc = `${activePageProfile.fontFamily} ${activePageProfile.fontSize}`;
+        if (headerFormatChip) {
+          headerFormatChip.textContent = `${fontDesc} • ${activePageProfile.alignment.includes("Justify") ? "Justify" : "Rata Kiri"}`;
+        }
+        if (sidebarFont) sidebarFont.textContent = fontDesc;
+        if (sidebarSpacing) sidebarSpacing.textContent = `Spasi ${activePageProfile.lineSpacing.split(" ")[0]}`;
+        if (sidebarAlign) sidebarAlign.textContent = activePageProfile.alignment.includes("Justify") ? "Justify" : "Rata Kiri";
+        if (sidebarTone) sidebarTone.textContent = activePageProfile.genreTag || "Skripsi Formal";
+      }
+    }
+  }
+
+  btnRelearn.onclick = async (e) => {
+    e.preventDefault();
+    statusText.textContent = "Mengalibrasi tipografi Google Docs ke standar 12pt...";
+    if (window.AutoTyper && typeof window.AutoTyper.calibrateTo12 === "function") {
+      await window.AutoTyper.calibrateTo12();
+    }
+    updateLearnedPageProfile(true);
+    statusText.textContent = "Format dokumen diselaraskan ke standar baku (12 pt).";
+  };
+
+  // ==========================================================================
+  // Autonomous Typing to Google Docs Engine
+  // Sesuai TYPING_PROTOCOL.md: 14pt Center Bab, 12pt Justify Body + 1x Tab, No SpellWiz
+  // ==========================================================================
   function startTypingToDocs(textToType) {
     if (!textToType || !textToType.trim()) {
-      statusEl.textContent = "Tidak ada draf yang dapat dimasukkan.";
+      statusText.textContent = "Tidak ada draf yang dapat dimasukkan.";
       return;
     }
 
-    // Clean draft delimiters if any
     const cleanContent = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
       ? window.AutoTyper.cleanMarkdownForDocs(textToType)
       : textToType;
 
-    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Memasukkan draf lengkap ke dokumen...';
+    // Minimize wide overlay or switch to split mode so user sees Docs being typed
+    if (!isSplitMode) {
+      setWindowVisible(false);
+    }
+
+    isTypingInProgress = true;
+    dockNav.classList.add("typing");
+    dockStatus.textContent = "Mengetik draf (0%)...";
+    statusText.textContent = "Memasukkan draf lengkap ke Google Docs...";
 
     if (window.AutoTyper) {
       setTimeout(() => {
         window.AutoTyper.typeDraft(cleanContent, {
           onProgress: (p) => {
-            statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Memasukkan draf ke dokumen (${p.percent}%)...`;
+            const pctMsg = `Mengetik (${p.percent}%)...`;
+            dockStatus.textContent = pctMsg;
+            statusText.textContent = `Memasukkan draf ke dokumen (${p.percent}%)...`;
           },
           onComplete: () => {
-            statusEl.textContent = "Selesai memasukkan satu draf ke dokumen Docs.";
-            stopBtn.style.display = "none";
+            isTypingInProgress = false;
+            dockNav.classList.remove("typing");
+            dockStatus.textContent = "Selesai (100%)";
+            statusText.textContent = "Draf berhasil diketik lengkap ke Google Docs.";
             updateLearnedPageProfile(true);
+            setTimeout(() => {
+              dockStatus.textContent = "";
+            }, 5000);
           },
           onError: (err) => {
-            statusEl.textContent = `Error: ${err}`;
-            stopBtn.style.display = "none";
+            isTypingInProgress = false;
+            dockNav.classList.remove("typing");
+            dockStatus.textContent = "Error pengetikan";
+            statusText.textContent = `Error: ${err}`;
           },
           onCancel: () => {
-            statusEl.textContent = "Penulisan dihentikan.";
-            stopBtn.style.display = "none";
+            isTypingInProgress = false;
+            dockNav.classList.remove("typing");
+            dockStatus.textContent = "Pengetikan dibatalkan";
+            statusText.textContent = "Pengetikan dihentikan.";
           }
         });
-      }, 25);
+      }, 50);
     } else {
-      statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
-      stopBtn.style.display = "none";
+      isTypingInProgress = false;
+      dockNav.classList.remove("typing");
+      statusText.textContent = "Error: AutoTyper engine tidak tersedia.";
     }
   }
 
-  stopBtn.onclick = () => {
-    if (window.AutoTyper) window.AutoTyper.stop();
-    statusEl.textContent = "Pengetikan dihentikan.";
-    stopBtn.style.display = "none";
-    if (runBtn) runBtn.disabled = false;
-  };
+  // ==========================================================================
+  // Render Assistant Message with Gemini Web Aesthetics & Super Action Button
+  // ==========================================================================
+  function appendMessage(role, text) {
+    if (welcomeContainer) welcomeContainer.style.display = "none";
 
-  // Render message item in in-page chat feed
-  function appendInPageMessage(role, rawText) {
-    if (inpageDiscussEmpty) inpageDiscussEmpty.style.display = "none";
-
-    const msgBox = document.createElement("div");
-    msgBox.className = role === "user" ? "inpage-msg-user" : "inpage-msg-assistant";
+    const row = document.createElement("div");
+    row.className = `gemini-msg-row ${role}`;
 
     if (role === "user") {
-      msgBox.textContent = rawText;
+      const bubble = document.createElement("div");
+      bubble.className = "gemini-msg-bubble user";
+      bubble.textContent = text;
+      row.appendChild(bubble);
     } else {
-      const { discussionText, draftText, hasDraft } = parseResponseDraft(rawText);
+      // Gemini Avatar
+      const avatar = document.createElement("div");
+      avatar.className = "gemini-assistant-avatar";
+      avatar.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+        </svg>
+      `;
+      row.appendChild(avatar);
 
+      // Gemini Bubble
+      const bubble = document.createElement("div");
+      bubble.className = "gemini-msg-bubble assistant";
+
+      const { discussionText, draftText, hasDraft } = parseResponseDraft(text);
+
+      // Markdown body
       if (discussionText) {
-        const discEl = document.createElement("div");
-        discEl.className = "inpage-msg-content";
-        discEl.textContent = discussionText;
-        msgBox.appendChild(discEl);
+        const mdEl = document.createElement("div");
+        mdEl.className = "gemini-markdown-body";
+        mdEl.innerHTML = renderMarkdown(discussionText);
+        bubble.appendChild(mdEl);
       }
 
-      if (hasDraft) {
+      // Ready Draft Container
+      if (hasDraft && draftText) {
         const draftBox = document.createElement("div");
-        draftBox.className = "inpage-draft-box";
+        draftBox.className = "gemini-draft-box";
         draftBox.innerHTML = `
-          <div class="inpage-draft-header">
-            <span class="inpage-draft-badge">DRAF DOKUMEN SIAP KETIK</span>
+          <div class="gemini-draft-tag-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+              <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+            </svg>
+            DRAF DOKUMEN SIAP KETIK
           </div>
-          <div class="inpage-draft-content">${escapeHtml(draftText)}</div>
+          <div class="gemini-draft-text-preview">${escapeHtml(draftText)}</div>
         `;
-        msgBox.appendChild(draftBox);
+        bubble.appendChild(draftBox);
       }
 
-      // Content that will be typed into Google Docs (clean draft prioritized)
-      const targetContent = hasDraft ? draftText : (discussionText || rawText);
+      const targetDraftContent = hasDraft ? draftText : (discussionText || text);
 
-      // Action toolbar for assistant response
+      // Super Action Toolbar
       const actionsEl = document.createElement("div");
-      actionsEl.className = "inpage-msg-actions";
+      actionsEl.className = "gemini-actions-toolbar";
 
+      // 1. PRIMARY: Ketik Otomatis ke Docs
       const btnType = document.createElement("button");
       btnType.type = "button";
-      btnType.className = "inpage-msg-action-btn primary";
-      btnType.textContent = "Ketik Otomatis ke Docs";
+      btnType.className = "gemini-action-btn-type";
+      btnType.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
+        </svg>
+        <span>Ketik Otomatis ke Docs</span>
+      `;
       btnType.onclick = () => {
-        startTypingToDocs(targetContent);
+        startTypingToDocs(targetDraftContent);
       };
 
-      const btnInsert = document.createElement("button");
-      btnInsert.type = "button";
-      btnInsert.className = "inpage-msg-action-btn";
-      btnInsert.textContent = "Insert";
-      btnInsert.onclick = () => {
-        if (window.DocsBridge && window.DocsBridge.injectText) {
-          window.DocsBridge.injectText(targetContent);
-          statusEl.textContent = "Draf dimasukkan ke dokumen.";
-        } else {
-          navigator.clipboard.writeText(targetContent);
-          statusEl.textContent = "Draf disalin ke clipboard.";
+      // 2. SUB: Salin Teks
+      const btnCopy = document.createElement("button");
+      btnCopy.type = "button";
+      btnCopy.className = "gemini-action-btn-sub";
+      btnCopy.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span>Salin</span>
+      `;
+      btnCopy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(targetDraftContent);
+          btnCopy.querySelector("span").textContent = "Tersalin!";
+          setTimeout(() => { btnCopy.querySelector("span").textContent = "Salin"; }, 2000);
+        } catch {
+          statusText.textContent = "Gagal menyalin teks.";
         }
       };
 
-      const btnCopy = document.createElement("button");
-      btnCopy.type = "button";
-      btnCopy.className = "inpage-msg-action-btn";
-      btnCopy.textContent = "Salin";
-      btnCopy.onclick = () => {
-        navigator.clipboard.writeText(targetContent);
-        statusEl.textContent = "Draf disalin ke clipboard.";
+      // 3. SUB: Insert Langsung
+      const btnInsert = document.createElement("button");
+      btnInsert.type = "button";
+      btnInsert.className = "gemini-action-btn-sub";
+      btnInsert.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        <span>Insert</span>
+      `;
+      btnInsert.onclick = () => {
+        if (window.DocsBridge && window.DocsBridge.injectText) {
+          window.DocsBridge.injectText(targetDraftContent);
+          statusText.textContent = "Draf berhasil dimasukkan ke posisi kursor.";
+        } else {
+          navigator.clipboard.writeText(targetDraftContent);
+          statusText.textContent = "Draf disalin ke clipboard.";
+        }
       };
 
       actionsEl.appendChild(btnType);
-      actionsEl.appendChild(btnInsert);
       actionsEl.appendChild(btnCopy);
-      msgBox.appendChild(actionsEl);
+      actionsEl.appendChild(btnInsert);
+      bubble.appendChild(actionsEl);
+
+      row.appendChild(bubble);
     }
 
-    inpageMessagesList.appendChild(msgBox);
-    msgBox.scrollIntoView({ behavior: "smooth" });
+    messagesList.appendChild(row);
+    chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: "smooth" });
   }
 
-  // Submit Discuss Turn
-  async function submitDiscussTurn() {
-    const text = discussInput.value.trim();
+  // ==========================================================================
+  // Sidebar Session History
+  // ==========================================================================
+  function addHistoryItem(promptText) {
+    recentPrompts.push(promptText);
+    const item = document.createElement("div");
+    item.className = "gemini-history-item active";
+    item.textContent = promptText.length > 28 ? promptText.slice(0, 28) + "..." : promptText;
+    item.title = promptText;
+
+    // Deselect other items
+    document.querySelectorAll(".gemini-history-item").forEach(el => el.classList.remove("active"));
+    historyList.prepend(item);
+  }
+
+  // ==========================================================================
+  // Prompt Execution: Send to Gemini Backend
+  // ==========================================================================
+  async function submitPrompt(customText = null) {
+    const text = (customText !== null ? customText : textareaInput.value).trim();
     if (!text) return;
 
-    appendInPageMessage("user", text);
-    inPageHistory.push({ role: "user", text });
+    appendMessage("user", text);
+    chatHistory.push({ role: "user", text });
+    addHistoryItem(text);
 
-    discussInput.value = "";
-    sendDiscussBtn.disabled = true;
-    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> GTyipe sedang menyusun analisis akademis...';
+    textareaInput.value = "";
+    autoResizeTextarea();
+    sendBtn.disabled = true;
+    statusText.textContent = "Gemini sedang memproses & menyusun draf dokumen...";
 
     const selected = getSelectedDocText();
     const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
 
     try {
       if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
-        statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh tab Docs.";
-        sendDiscussBtn.disabled = false;
+        statusText.textContent = "Ekstensi telah dimuat ulang. Harap refresh tab Google Docs.";
+        sendBtn.disabled = false;
         return;
       }
 
       chrome.runtime.sendMessage({
         type: "ASK_GEMINI",
         prompt: text,
-        history: inPageHistory.slice(0, -1),
+        history: chatHistory.slice(0, -1),
         mode: "discuss",
         selectedContext: selected,
         pageProfile: profile
       }, (res) => {
-        sendDiscussBtn.disabled = false;
+        sendBtn.disabled = false;
         if (chrome.runtime.lastError || !res?.success) {
-          inPageHistory.pop();
+          chatHistory.pop();
           const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";
-          statusEl.textContent = `Error: ${rawErr}`;
+          statusText.textContent = `Error: ${rawErr}`;
           return;
         }
 
         const reply = res.text;
-        inPageHistory.push({ role: "model", text: reply });
-        appendInPageMessage("assistant", reply);
-        statusEl.textContent = "Tanggapan siap. Klik 'Ketik Otomatis ke Docs' untuk mengetik draf ke halaman.";
+        chatHistory.push({ role: "model", text: reply });
+        appendMessage("assistant", reply);
+        statusText.textContent = "Tanggapan siap. Klik 'Ketik Otomatis ke Docs' untuk memasukkan draf ke halaman.";
       });
     } catch (err) {
-      sendDiscussBtn.disabled = false;
-      statusEl.textContent = `Error: ${err.message || err}`;
+      sendBtn.disabled = false;
+      statusText.textContent = `Error: ${err.message || err}`;
     }
   }
 
-  sendDiscussBtn.onclick = () => submitDiscussTurn();
-  discussInput.onkeydown = (e) => {
+  sendBtn.onclick = () => submitPrompt();
+  textareaInput.onkeydown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      submitDiscussTurn();
+      submitPrompt();
     }
   };
 
-  clearChatBtn.onclick = () => {
-    inPageHistory = [];
-    inpageMessagesList.innerHTML = "";
-    if (inpageDiscussEmpty) inpageDiscussEmpty.style.display = "flex";
-    statusEl.textContent = "Riwayat diskusi in-page telah dibersihkan.";
+  // Suggestion Cards on Welcome Screen
+  document.querySelectorAll(".gemini-prompt-card").forEach((card) => {
+    card.onclick = () => {
+      const p = card.dataset.prompt;
+      if (p) submitPrompt(p);
+    };
+  });
+
+  // Quick Chips Row
+  document.querySelectorAll(".gemini-chip-btn").forEach((chip) => {
+    chip.onclick = () => {
+      const p = chip.dataset.prompt;
+      if (p) submitPrompt(p);
+    };
+  });
+
+  // New Chat Button
+  btnNewChat.onclick = () => {
+    chatHistory = [];
+    messagesList.innerHTML = "";
+    if (welcomeContainer) welcomeContainer.style.display = "flex";
+    statusText.textContent = "Sesi baru dimulai. Siap menerima prompt.";
+    textareaInput.value = "";
+    textareaInput.focus();
+    autoResizeTextarea();
   };
 
-  // Submit Direct Write
-  runBtn.onclick = async () => {
-    const promptText = promptInput.value.trim();
-    if (!promptText) {
-      statusEl.textContent = "Ketik instruksi prompt terlebih dahulu.";
-      return;
-    }
-
-    runBtn.disabled = true;
-    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> GTyipe sedang menyusun draf...';
-
-    promptInput.blur();
-    runBtn.blur();
-
-    const selected = getSelectedDocText();
-    const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
-
-    // Deteksi apakah pengguna meminta perbaikan di lokasi/bagian tertentu di dokumen
-    const navMatch = promptText.match(/(?:perbaiki|revisi|ubah|ganti|tambah(?:kan)?\s+di|ke)\s+(?:bagian\s+)?(bab\s+[ivxlcdm\d]+|latar\s+belakang|rumusan\s+masalah|tujuan|tinjauan\s+pustaka|metodologi|kesimpulan|daftar\s+isi|daftar\s+pustaka|atas|bawah|awal|akhir)/i);
-    if (navMatch && window.CursorNavigator) {
-      const targetSec = navMatch[1];
-      statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Mengarahkan kursor ke ${targetSec}...`;
-      await window.CursorNavigator.moveToSection(targetSec);
-    }
-
-    try {
-      if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
-        statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh tab Docs.";
-        runBtn.disabled = false;
-        return;
-      }
-
-      chrome.runtime.sendMessage({
-        type: "ASK_GEMINI",
-        prompt: promptText,
-        history: [],
-        mode: "write",
-        selectedContext: selected,
-        pageProfile: profile
-      }, async (res) => {
-        runBtn.disabled = false;
-        if (chrome.runtime.lastError || !res?.success) {
-          const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";
-          statusEl.textContent = `Error: ${rawErr}`;
-          return;
-        }
-
-        const { draftText } = parseResponseDraft(res.text);
-
-        if (navMatch && window.CursorNavigator) {
-          await window.CursorNavigator.moveToSection(navMatch[1]);
-        }
-
-        startTypingToDocs(draftText);
-      });
-    } catch (err) {
-      runBtn.disabled = false;
-      statusEl.textContent = `Error: ${err.message || err}`;
-    }
+  // Clear Chat Button
+  btnClearChat.onclick = () => {
+    chatHistory = [];
+    messagesList.innerHTML = "";
+    historyList.innerHTML = "";
+    recentPrompts = [];
+    if (welcomeContainer) welcomeContainer.style.display = "flex";
+    statusText.textContent = "Seluruh riwayat chat telah dibersihkan.";
   };
 
-  promptInput.onkeydown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      runBtn.click();
-    }
-  };
+  // Initial Profiling on Load
+  setTimeout(() => {
+    updateHeaderDocInfo();
+    updateLearnedPageProfile(false);
+  }, 1000);
 })();
