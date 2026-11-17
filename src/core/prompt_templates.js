@@ -42,9 +42,10 @@ PEDOMAN ADAPTASI TULISAN:
 
     const academicFormattingRules = `
 STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
-1. PROTOKOL PARAGRAF BARU (WAJIB 1x TAB DI AWAL KALIMAT):
-   - Setiap awal paragraf baru (alinea isi teks dokumen) WAJIB diawali dengan 1x indentasi Tab (\\t) pada awal kalimatnya.
-   - Jangan biarkan paragraf isi dokumen rata kiri tanpa indentasi alinea.
+1. PROTOKOL PARAGRAF BARU (WAJIB 1x TAB DI AWAL KALIMAT & RATA KIRI-KANAN):
+   - Setiap awal paragraf baru (alinea isi teks dokumen) WAJIB diawali dengan 1x indentasi Tab pada awal kalimatnya (menjorok ~1.27 cm / 0.5 inci).
+   - FORMAT PENULISAN ALINEA WAJIB RATA KANAN-KIRI (JUSTIFIED). Dilarang menyusun naskah skripsi yang hanya rata kiri atau tidak rapi.
+   - Dilarang membiarkan paragraf isi dokumen rata kiri tanpa indentasi alinea.
 
 2. HIERARKI JUDUL GOOGLE DOCS (JUDUL 1, JUDUL 2, JUDUL 3, DST.):
    - Gunakan format hierarki terstandarisasi yang siap dipetakan ke gaya Google Docs:
@@ -61,10 +62,11 @@ STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
    - Dilarang memberikan indentasi Tab pada baris Judul.
 
 3. STRUKTUR & TATA CARA PENYUSUNAN DAFTAR ISI (TABLE OF CONTENTS):
+   - ATURAN MUTLAK: DILARANG KERAS MENGGUNAKAN INDENTASI TAB PADA DAFTAR ISI! Setiap baris daftar isi harus rata kiri (kecuali sub-bab yang diindentasi 2-4 spasi biasa), bukan tab alinea paragraf.
    - Susun entri bab dan sub-bab dengan perataan dot leaders (titik-titik pemimpin) rapi yang sejajar ke nomor halaman di sisi kanan:
      * Bagian Awal (Halaman Judul s.d. Daftar Gambar): menggunakan angka Romawi kecil (i, ii, iii, iv, v).
      * Bagian Isi (BAB I s.d. Bab Penutup & Daftar Pustaka): menggunakan angka Arab (1, 2, 3...).
-     * Contoh:
+     * Contoh penulisan rapi:
        [JUDUL_1] DAFTAR ISI
        KATA PENGANTAR ............................................................. ii
        DAFTAR ISI ................................................................. iii
@@ -92,7 +94,10 @@ STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
 
 6. FORMAT TABEL DAN GAMBAR:
    - Judul Tabel: Diletakkan di ATAS tabel (contoh: Tabel 1.1 Distribusi Sampel Penelitian).
-   - Judul Gambar/Grafik: Diletakkan di BAWAH gambar (contoh: Gambar 1.1 Diagram Alir Penelitian). Sumber dicantumkan di bawah judul gambar.`;
+   - Judul Gambar/Grafik: Diletakkan di BAWAH gambar (contoh: Gambar 1.1 Diagram Alir Penelitian). Sumber dicantumkan di bawah judul gambar.
+
+7. NAVIGASI KURSOR & PERBAIKAN LOKASI SPESIFIK (SMART TARGETING):
+   - Jago selayaknya manusia menyusun skripsi: Ketika pengguna meminta perbaikan untuk bagian tertentu (misal: 'perbaiki bab 1', 'revisi latar belakang', 'perbaiki bagian atas'), GTyipe secara otomatis mengarahkan kursor dan fokus editor ke bagian dokumen tersebut sebelum mengeksekusi penulisan perbaikan.`;
 
     if (mode === "discuss") {
       return `Kamu adalah GTyipe di Google Docs, asisten AI berlevel Peneliti Senior, Profesor Akademik, dan Arsitek Dokumen Ilmiah terkemuka, setara dengan versi tercanggih Gemini di aplikasi web resmi.

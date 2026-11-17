@@ -44,7 +44,7 @@ export const ActionHandlers = {
     }
   },
 
-  async autoTypeToDocs(text, speedMs = 0) {
+  async autoTypeToDocs(text, speedMs = 0, targetSection = null) {
     if (!text) throw new Error("Tidak ada konten untuk diketik.");
     const tab = await this.getActiveTab();
     if (!tab?.id) throw new Error("Tab Google Docs tidak ditemukan.");
@@ -52,8 +52,24 @@ export const ActionHandlers = {
     return chrome.tabs.sendMessage(tab.id, {
       action: "AUTO_TYPE_REVISION",
       text,
-      speedMs: 0
+      speedMs: 0,
+      targetSection
     });
+  },
+
+  async moveCursor(query) {
+    if (!query) return false;
+    const tab = await this.getActiveTab();
+    if (!tab?.id) return false;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, {
+        action: "MOVE_CURSOR_TO",
+        query
+      });
+      return res?.success || false;
+    } catch {
+      return false;
+    }
   },
 
   async insertToDocs(text) {

@@ -19,10 +19,25 @@
 
 ---
 
-## 2. Protokol Indentasi Paragraf Baru (Wajib 1x Tab)
-* **Aturan Mutlak**: Setiap kali memulai atau membuat paragraf baru (alinea teks dokumen), **WAJIB di-TAB satu kali (`\t`) pada awal kalimat pertama**.
-* **Pengecualian**: Baris Judul (Judul 1, Judul 2, Judul 3) dan Daftar Poin (`- ` atau `1. `) tidak diberikan Tab.
-* **Penegakan Otomatis di Mesin**: `auto_typer.js` secara otomatis menyisipkan 1x Tab jika paragraf belum memiliki indentasi tab.
+## 2. Protokol Indentasi Paragraf Baru (Wajib 1x Tab & Rata Kiri-Kanan)
+* **Aturan Mutlak 1x Tab**: Setiap kali memulai atau membuat paragraf baru (alinea teks dokumen), **WAJIB di-TAB satu kali pada awal kalimat pertama** (menjorok ~1.27 cm / 0.5 inci).
+* **Format Wajib Rata Kanan-Kiri (Justified)**: Seluruh alinea dokumen wajib berformat Rata Kanan-Kiri (menggunakan pintasan keyboard resmi `Ctrl + Shift + J` dan sinkronisasi tombol toolbar Google Docs).
+* **Penegakan Visual 1x Tab**: `auto_typer.js` menginjeksikan sequence 7 non-breaking spaces (`\u00A0`) dan event Tab sehingga kanvas Google Docs dijamin menampilkan indentasi alinea secara nyata tanpa terhapus atau diciutkan.
+* **Pengecualian Mutlak**: Baris Judul (Judul 1, Judul 2, Judul 3), Daftar Poin (`- ` atau `1. `), dan **Daftar Isi (Table of Contents)** DILARANG KERAS diberi indentasi Tab.
+
+---
+
+## 3. Protokol Daftar Isi (Bebas Tab & Rapi)
+* **Dilarang Ngetab di Daftar Isi**: Baris daftar isi harus rata kiri (dengan penjorokan 2-4 spasi biasa hanya untuk sub-bab), tidak boleh menggunakan tab alinea.
+* **Perataan Titik Pemimpin**: Menggunakan dot leaders (`..........`) yang sejajar rapi ke nomor halaman Romawi (`i, ii, iii`) untuk bagian awal dan Arab (`1, 2, 3`) untuk bagian isi.
+
+---
+
+## 4. Smart Cursor Navigator (Gerak-gerak Kursor & Target Perbaikan)
+* **Navigasi Cerdas**: GTyipe mampu menggerakkan kursor layaknya manusia menyusun skripsi:
+  * `moveToTop()`: Mengarahkan kursor ke bagian paling atas dokumen (`Ctrl + Home`).
+  * `moveToBottom()`: Mengarahkan kursor ke bagian paling bawah dokumen (`Ctrl + End`).
+  * `moveToSection(query)`: Mencari lokasi bab, sub-bab, atau cuplikan kalimat tertentu di outline atau kanvas editor Google Docs, melakukan scroll mulus, dan menempatkan caret editor tepat di lokasi perbaikan sebelum draf diketik.
 
 ---
 

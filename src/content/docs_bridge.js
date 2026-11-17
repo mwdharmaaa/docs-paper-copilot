@@ -115,30 +115,50 @@
     }
 
     if (request.action === "AUTO_TYPE_REVISION") {
-      const { text } = request;
+      const { text, targetSection } = request;
       if (!text) {
         sendResponse({ success: false, error: "Empty text payload" });
         return false;
       }
 
-      if (window.AutoTyper) {
-        window.AutoTyper.typeDraft(text, {
-          onComplete: () => {
-            showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
-          },
-          onError: (err) => {
-            showDocsNotification(err || "Gagal memasukkan draf ke dokumen.");
-          }
-        });
-        sendResponse({ success: true, started: true });
-      } else {
-        const cleanText = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
-          ? window.AutoTyper.cleanMarkdownForDocs(text)
-          : text;
-        const injected = simulatePaste(cleanText);
-        sendResponse({ success: true, fallback: "paste", pasted: injected });
+      async function executeAutoType() {
+        if (targetSection && window.CursorNavigator) {
+          await window.CursorNavigator.moveToSection(targetSection);
+        }
+
+        if (window.AutoTyper) {
+          window.AutoTyper.typeDraft(text, {
+            onComplete: () => {
+              showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
+            },
+            onError: (err) => {
+              showDocsNotification(err || "Gagal memasukkan draf ke dokumen.");
+            }
+          });
+          return { success: true, started: true };
+        } else {
+          const cleanText = (window.AutoTyper && typeof window.AutoTyper.cleanMarkdownForDocs === "function")
+            ? window.AutoTyper.cleanMarkdownForDocs(text)
+            : text;
+          const injected = simulatePaste(cleanText);
+          return { success: true, fallback: "paste", pasted: injected };
+        }
       }
+
+      executeAutoType().then((res) => sendResponse(res));
       return true;
+    }
+
+    if (request.action === "MOVE_CURSOR_TO") {
+      const { query } = request;
+      if (window.CursorNavigator) {
+        window.CursorNavigator.moveToSection(query).then((moved) => {
+          sendResponse({ success: true, moved });
+        });
+        return true;
+      }
+      sendResponse({ success: false, error: "CursorNavigator tidak tersedia." });
+      return false;
     }
 
     return false;

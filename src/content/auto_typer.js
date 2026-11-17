@@ -1,14 +1,18 @@
 /**
  * Docs Paper Copilot - Auto Typer Engine
  * Protokol Resmi: LANGSUNG SELESAI SATU DRAF (Instant Whole Draft)
- * Indentasi Baku: 1x TAB DI AWAL SETIAP PARAGRAF BARU
- * Format Judul: DUKUNGAN HIERARKI JUDUL 1, JUDUL 2, JUDUL 3 (Google Docs Headings)
+ * Indentasi Baku: 1x TAB DI AWAL SETIAP PARAGRAF BARU (7 non-breaking spaces)
+ * Format Alinea: WAJIB RATA KIRI-KANAN (Justify / Ctrl+Shift+J)
+ * Format Daftar Isi: BERSIH & RAPI TANPA INDENTASI TAB
+ * Format Judul: HIERARKI JUDUL 1, JUDUL 2, JUDUL 3 (Google Docs Headings)
+ * Navigasi Kursor: SMART CURSOR MOVEMENT & TARGET SECTION FINDER
  * 
  * ATURAN MUTLAK / PROTOKOL PERMANEN:
  * Berdasarkan instruksi pengguna: PROTOKOL INI TIDAK BOLEH DIUBAH PADA UPDATE APAPUN.
  * Jangan pernah mengubah kembali ke mode animasi ketik lambat per-karakter.
- * Sekali aksi pengetikan dipicu, seluruh draf dokumen diselesaikan dan dimasukkan secara langsung.
  * Paragraf baru wajib diawali dengan 1x Tab (indentasi alinea).
+ * Daftar Isi DILARANG diberi indentasi Tab alinea.
+ * Teks isi dokumen wajib berformat Rata Kanan-Kiri (Justify).
  * Strictly zero emojis and pure monochrome workflow.
  */
 
@@ -90,22 +94,16 @@
       // 3. Hapus garis horizontal (---, ***, ___)
       s = s.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, "");
 
-      // 4. Standarisasi daftar poin
-      s = s.replace(/^[ \t]*\*[ \t]+/gm, "- ");
-
-      // 5. Bersihkan asterisk dalam kurung ilmiah: (*Betta splendens*) -> (Betta splendens)
-      s = s.replace(/\(\*+([^*]+)\*+\)/g, "($1)");
-
-      // 6. Hapus asterisk penanda tebal/miring dari teks Docs murni
+      // 4. Bersihkan asterisk penanda tebal/miring dari teks Docs murni
       s = s.replace(/\*{3}([^*]+)\*{3}/g, "$1");
       s = s.replace(/\*{2}([^*]+)\*{2}/g, "$1");
       s = s.replace(/\*([^*\r\n]+)\*/g, "$1");
       s = s.replace(/\*/g, "");
 
-      // 7. Hapus backtick
+      // 5. Hapus backtick
       s = s.replace(/`/g, "");
 
-      // 8. Normalisasi jarak baris berlebih
+      // 6. Normalisasi jarak baris berlebih
       s = s.replace(/(\r?\n){3,}/g, "\n\n");
 
       return s.trim();
@@ -146,8 +144,72 @@
     },
 
     /**
+     * Terapkan Format Rata Kiri-Kanan (Justify Alignment)
+     * Menggunakan pintasan resmi Google Docs: Ctrl + Shift + J
+     * Serta sinkronisasi tombol toolbar Google Docs.
+     */
+    applyJustifyAlignment(target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      if (!tgt) return false;
+
+      // 1. Dispatch keyboard shortcut Ctrl+Shift+J
+      try {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "J",
+          code: "KeyJ",
+          keyCode: 74,
+          which: 74,
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        tgt.dispatchEvent(new KeyboardEvent("keyup", {
+          key: "J",
+          code: "KeyJ",
+          keyCode: 74,
+          which: 74,
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+      } catch (e) {
+        console.warn("[AutoTyper] Justify shortcut dispatch:", e);
+      }
+
+      // 2. Klik tombol toolbar Justify jika tersedia
+      try {
+        const justifyBtn =
+          document.getElementById("alignJustify") ||
+          document.querySelector("[aria-label*='Rata kanan kiri']") ||
+          document.querySelector("[aria-label*='Justify']") ||
+          document.querySelector("[id*='alignJustify']") ||
+          document.querySelector(".docs-icon-align-justify")?.closest("[role='button']");
+
+        if (justifyBtn) {
+          const isChecked =
+            justifyBtn.getAttribute("aria-pressed") === "true" ||
+            justifyBtn.getAttribute("aria-checked") === "true" ||
+            justifyBtn.classList.contains("goog-toolbar-button-checked") ||
+            justifyBtn.classList.contains("docs-material-button-checked");
+
+          if (!isChecked && typeof justifyBtn.click === "function") {
+            justifyBtn.click();
+          }
+        }
+      } catch (e) {
+        console.warn("[AutoTyper] Justify button click:", e);
+      }
+
+      return true;
+    },
+
+    /**
      * Terapkan Format Judul Google Docs (Heading 1..6 / Normal Text)
-     * Menggunakan pintasan keyboard resmi Google Docs:
      * - Ctrl+Alt+1: Judul 1 (Heading 1)
      * - Ctrl+Alt+2: Judul 2 (Heading 2)
      * - Ctrl+Alt+3: Judul 3 (Heading 3)
@@ -160,7 +222,7 @@
 
       const lvl = Math.max(0, Math.min(6, parseInt(level, 10) || 0));
       const keyStr = String(lvl);
-      const charCode = 48 + lvl; // 0 -> 48, 1 -> 49, dst.
+      const charCode = 48 + lvl;
       const codeStr = lvl === 0 ? "Digit0" : `Digit${lvl}`;
 
       try {
@@ -260,7 +322,10 @@
     },
 
     /**
-     * Memasukkan Karakter Tab (Indentasi Paragraf Baku)
+     * Memasukkan Indentasi 1x Tab Resmi Skripsi (Visible First-Line Indent).
+     * Menggunakan sequence 7 non-breaking spaces (\u00A0) dan event Tab,
+     * sehingga kanvas Google Docs dijamin menampilkan indentasi ~1.27 cm (0.5 inci)
+     * secara nyata dan tidak terhapus / diciutkan oleh render engine.
      */
     insertTab(target = null, iframe = null) {
       const tgt = target || this.getEditorTarget();
@@ -277,40 +342,15 @@
           cancelable: true,
           composed: true
         }));
+      } catch {}
 
-        tgt.dispatchEvent(new KeyboardEvent("keypress", {
-          key: "Tab",
-          code: "Tab",
-          charCode: 9,
-          keyCode: 9,
-          which: 9,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
+      // Masukkan 7 non-breaking spaces sebagai representasi visual 1x Tab alinea karya ilmiah
+      const tabSpaces = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0";
+      for (const ch of tabSpaces) {
+        this.insertChar(ch, tgt, ifr);
+      }
 
-        tgt.dispatchEvent(new InputEvent("beforeinput", {
-          inputType: "insertText",
-          data: "\t",
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-
-        if (ifr && ifr.contentDocument) {
-          try {
-            ifr.contentDocument.execCommand("insertText", false, "\t");
-          } catch {}
-        }
-
-        tgt.dispatchEvent(new InputEvent("input", {
-          inputType: "insertText",
-          data: "\t",
-          bubbles: true,
-          cancelable: false,
-          composed: true
-        }));
-
+      try {
         tgt.dispatchEvent(new KeyboardEvent("keyup", {
           key: "Tab",
           code: "Tab",
@@ -320,12 +360,9 @@
           cancelable: true,
           composed: true
         }));
+      } catch {}
 
-        return true;
-      } catch (err) {
-        console.warn("[AutoTyper] insertTab failed:", err);
-        return false;
-      }
+      return true;
     },
 
     insertChar(ch, target = null, iframe = null) {
@@ -346,7 +383,7 @@
         if (ch >= "A" && ch <= "Z") code = "Key" + ch;
         else if (ch >= "a" && ch <= "z") code = "Key" + ch.toUpperCase();
         else if (ch >= "0" && ch <= "9") code = "Digit" + ch;
-        else if (ch === " ") code = "Space";
+        else if (ch === " " || ch === "\u00A0") code = "Space";
 
         tgt.dispatchEvent(new KeyboardEvent("keydown", {
           key: ch,
@@ -417,6 +454,26 @@
     },
 
     /**
+     * Deteksi apakah baris merupakan bagian dari Daftar Isi (Table of Contents).
+     * Baris Daftar Isi DILARANG diberi indentasi Tab alinea!
+     */
+    isTableOfContentsLine(rawLine) {
+      if (!rawLine || typeof rawLine !== "string") return false;
+      const trimmed = rawLine.trim();
+
+      // Mengandung titik-titik pemimpin (dot leaders, e.g. "...", ".......")
+      if (/\.{2,}/.test(trimmed)) return true;
+
+      // Diakhiri nomor halaman setelah titik/spasi (e.g. "... 1", "... ii", "... 25")
+      if (/(?:\.|\s)+\s*(?:[ivxlcdm]+|\d+)\s*$/i.test(trimmed)) return true;
+
+      // Header Daftar Isi itu sendiri
+      if (/^\[?(?:JUDUL_1|H1)?\]?\s*DAFTAR\s+ISI/i.test(trimmed)) return true;
+
+      return false;
+    },
+
+    /**
      * Menganalisis apakah baris teks merupakan Judul (Heading) atau Paragraf biasa.
      */
     parseLineHeading(rawLine) {
@@ -464,7 +521,8 @@
 
     /**
      * PROTOKOL UTAMA: Langsung Selesai Satu Draf (Instant Whole Draft)
-     * Mengintegrasikan format Judul 1/2/3 dan Indentasi Tab Paragraf Baru.
+     * Mengintegrasikan format Judul 1/2/3, Indentasi Tab Paragraf Baru,
+     * Perataan Rata Kanan-Kiri (Justify), dan Penanganan Rapi Daftar Isi.
      */
     async typeDraft(rawText, options = {}) {
       const {
@@ -509,6 +567,11 @@
         return true;
       }
 
+      // Terapkan perataan Rata Kanan-Kiri (Justify) di awal dokumen
+      this.applyJustifyAlignment(target, iframe);
+
+      let inTocBlock = false;
+
       for (let i = 0; i < total; i++) {
         if (this.abortRequested) {
           this.isTyping = false;
@@ -526,9 +589,17 @@
           const rawLine = lines[l].trim();
           if (!rawLine) continue;
 
-          const hInfo = this.parseLineHeading(rawLine);
+          // Deteksi apakah sedang dalam blok Daftar Isi
+          if (/^\[?(?:JUDUL_1|H1)?\]?\s*DAFTAR\s+ISI/i.test(rawLine)) {
+            inTocBlock = true;
+          } else if (inTocBlock && /^\[?(?:JUDUL_1|H1)?\]?\s*BAB\s+[IVXLCDM]+/i.test(rawLine)) {
+            inTocBlock = false;
+          }
 
-          if (hInfo.isHeading && hInfo.level > 0) {
+          const hInfo = this.parseLineHeading(rawLine);
+          const isTocLine = inTocBlock || this.isTableOfContentsLine(rawLine);
+
+          if (hInfo.isHeading && hInfo.level > 0 && !isTocLine) {
             // ========================================================
             // EKSEKUSI FORMAT JUDUL (Judul 1, Judul 2, Judul 3, dst.)
             // ========================================================
@@ -542,24 +613,53 @@
 
             if (l < lines.length - 1 || i < total - 1) {
               this.insertNewline(target, iframe);
-              // Kembalikan ke Normal Text untuk baris selanjutnya
+              // Kembalikan ke Normal Text dan Rata Kiri-Kanan untuk baris berikutnya
               this.applyHeading(0, target, iframe);
               this.ensureNormalFont();
+              this.applyJustifyAlignment(target, iframe);
             }
-          } else {
+          } else if (isTocLine) {
             // ========================================================
-            // EKSEKUSI PARAGRAF BIASA / ISI DOKUMEN
-            // PROTOKOL BAKU: Wajib di-Tab 1x pada awal kalimat paragraf baru!
+            // EKSEKUSI BARIS DAFTAR ISI (TABLE OF CONTENTS)
+            // ATURAN BAKU: DILARANG NGETAB ALINEA PADA DAFTAR ISI!
+            // Ditulis bersih sesuai struktur tanpa tab paragraf baru.
             // ========================================================
             this.applyHeading(0, target, iframe);
             this.ensureNormalFont();
 
+            // Bersihkan tag judul jika ada
+            const cleanTocText = rawLine.replace(/^\[(?:JUDUL_\d|H\d)\]\s*/i, "");
+            const chars = Array.from(cleanTocText);
+            for (let c = 0; c < chars.length; c++) {
+              if (this.abortRequested) break;
+              this.insertChar(chars[c], target, iframe);
+            }
+
+            if (l < lines.length - 1) {
+              this.insertNewline(target, iframe);
+            }
+          } else {
+            // ========================================================
+            // EKSEKUSI PARAGRAF BIASA / ISI DOKUMEN
+            // PROTOKOL BAKU:
+            // 1. Wajib di-Tab 1x (7 non-breaking spaces) pada awal kalimat alinea baru!
+            // 2. Format tulisan wajib Rata Kanan-Kiri (Justify)!
+            // ========================================================
+            this.applyHeading(0, target, iframe);
+            this.ensureNormalFont();
+            this.applyJustifyAlignment(target, iframe);
+
             const isList = /^[-*•]\s+/.test(hInfo.text) || /^\d+\.\s+/.test(hInfo.text);
             let textToType = hInfo.text;
 
-            // Indentasi 1x Tab jika baris pertama alinea dan bukan daftar poin
-            if (l === 0 && !isList && !textToType.startsWith("\t") && textToType.length > 0) {
-              textToType = "\t" + textToType;
+            // Bersihkan tab lama di awal jika ada, agar digantikan tab terstandarisasi
+            if (textToType.startsWith("\t")) {
+              textToType = textToType.replace(/^\t+/, "");
+            }
+
+            // Sisipkan 1x Tab jika baris pertama alinea dan bukan daftar poin
+            if (l === 0 && !isList && textToType.length > 0) {
+              this.insertTab(target, iframe);
             }
 
             const chars = Array.from(textToType);
@@ -620,5 +720,164 @@
     }
   };
 
+  /**
+   * ==========================================================================
+   * SMART CURSOR NAVIGATOR ENGINE (Gerak-gerakin Kursor & Pencari Bagian Tepat)
+   * Memungkinkan GTyipe menavigasikan kursor ke atas, ke bawah, ke bab/judul
+   * spesifik, atau mencari cuplikan teks di dokumen untuk perbaikan draf.
+   * ==========================================================================
+   */
+  const CursorNavigator = {
+    getEditorTarget() {
+      return AutoTyper.getEditorTarget();
+    },
+
+    getEditorIframe() {
+      return AutoTyper.getEditorIframe();
+    },
+
+    /**
+     * Gerakkan kursor ke paling atas dokumen (Ctrl + Home).
+     */
+    moveToTop() {
+      const tgt = this.getEditorTarget();
+      if (!tgt) return false;
+      AutoTyper.focusEditor();
+
+      tgt.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Home",
+        code: "Home",
+        keyCode: 36,
+        which: 36,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }));
+
+      tgt.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "Home",
+        code: "Home",
+        keyCode: 36,
+        which: 36,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }));
+
+      return true;
+    },
+
+    /**
+     * Gerakkan kursor ke paling bawah dokumen (Ctrl + End).
+     */
+    moveToBottom() {
+      const tgt = this.getEditorTarget();
+      if (!tgt) return false;
+      AutoTyper.focusEditor();
+
+      tgt.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "End",
+        code: "End",
+        keyCode: 35,
+        which: 35,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }));
+
+      tgt.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "End",
+        code: "End",
+        keyCode: 35,
+        which: 35,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true
+      }));
+
+      return true;
+    },
+
+    /**
+     * Cari bagian/judul/bab atau cuplikan teks di dokumen dan tempatkan kursor di sana.
+     * Mendukung pencarian outline Google Docs dan pencarian teks kanvas kix.
+     */
+    async moveToSection(sectionQuery) {
+      if (!sectionQuery || typeof sectionQuery !== "string") return false;
+      const q = sectionQuery.toLowerCase().trim();
+
+      // Kasus khusus arah dokumen
+      if (q.includes("paling atas") || q.includes("bagian atas") || q.includes("awal dokumen")) {
+        return this.moveToTop();
+      }
+      if (q.includes("paling bawah") || q.includes("bagian bawah") || q.includes("akhir dokumen")) {
+        return this.moveToBottom();
+      }
+
+      // 1. Coba klik Google Docs Document Outline jika query berupa Judul/Bab
+      const outlineItems = document.querySelectorAll(
+        ".docs-navigation-tab-button, .navigation-item, .docs-navigation-item, [role='treeitem']"
+      );
+      for (const item of outlineItems) {
+        const txt = item.textContent?.toLowerCase() || "";
+        if (txt.includes(q)) {
+          item.click();
+          await new Promise((r) => setTimeout(r, 80));
+          AutoTyper.focusEditor();
+          return true;
+        }
+      }
+
+      // 2. Cari di elemen paragraf dan baris yang dirender di kanvas editor Google Docs
+      const paragraphs = document.querySelectorAll(
+        ".kix-paragraphrenderer, .kix-lineview, .kix-lineview-text-block, .kix-word-htmlelement"
+      );
+
+      for (const p of paragraphs) {
+        const txt = p.textContent?.toLowerCase() || "";
+        if (txt.includes(q)) {
+          p.scrollIntoView({ behavior: "smooth", block: "center" });
+          await new Promise((r) => setTimeout(r, 100));
+
+          // Kirim event klik mouse di koordinat elemen untuk memindahkan caret Google Docs
+          const rect = p.getBoundingClientRect();
+          const clientX = rect.left + Math.min(30, rect.width / 2);
+          const clientY = rect.top + Math.min(12, rect.height / 2);
+
+          const opts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+          p.dispatchEvent(new MouseEvent("mousedown", opts));
+          p.dispatchEvent(new MouseEvent("mouseup", opts));
+          p.dispatchEvent(new MouseEvent("click", opts));
+
+          AutoTyper.focusEditor();
+          return true;
+        }
+      }
+
+      // 3. Fallback: Dispatch shortcut find Google Docs (Ctrl+F)
+      const tgt = this.getEditorTarget();
+      if (tgt) {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "f",
+          code: "KeyF",
+          keyCode: 70,
+          which: 70,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+      }
+
+      return false;
+    }
+  };
+
+  AutoTyper.cursor = CursorNavigator;
   window.AutoTyper = AutoTyper;
+  window.CursorNavigator = CursorNavigator;
 })();

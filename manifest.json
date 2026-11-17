@@ -44,6 +44,12 @@
       "css": [
         "src/content/in_page_agent.css"
       ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://docs.google.com/document/*"
+      ],
       "js": [
         "src/content/auto_typer.js",
         "src/content/page_learner.js",

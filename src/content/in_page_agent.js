@@ -485,6 +485,14 @@
     const selected = getSelectedDocText();
     const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
 
+    // Deteksi apakah pengguna meminta perbaikan di lokasi/bagian tertentu di dokumen
+    const navMatch = promptText.match(/(?:perbaiki|revisi|ubah|ganti|tambah(?:kan)?\s+di|ke)\s+(?:bagian\s+)?(bab\s+[ivxlcdm\d]+|latar\s+belakang|rumusan\s+masalah|tujuan|tinjauan\s+pustaka|metodologi|kesimpulan|daftar\s+isi|daftar\s+pustaka|atas|bawah|awal|akhir)/i);
+    if (navMatch && window.CursorNavigator) {
+      const targetSec = navMatch[1];
+      statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Mengarahkan kursor ke ${targetSec}...`;
+      await window.CursorNavigator.moveToSection(targetSec);
+    }
+
     try {
       if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
         statusEl.textContent = "Ekstensi telah dimuat ulang. Harap refresh tab Docs.";
@@ -499,7 +507,7 @@
         mode: "write",
         selectedContext: selected,
         pageProfile: profile
-      }, (res) => {
+      }, async (res) => {
         runBtn.disabled = false;
         if (chrome.runtime.lastError || !res?.success) {
           const rawErr = chrome.runtime.lastError?.message || res?.error || "Gagal memproses";
@@ -508,6 +516,11 @@
         }
 
         const { draftText } = parseResponseDraft(res.text);
+
+        if (navMatch && window.CursorNavigator) {
+          await window.CursorNavigator.moveToSection(navMatch[1]);
+        }
+
         startTypingToDocs(draftText);
       });
     } catch (err) {
