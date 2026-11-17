@@ -42,42 +42,54 @@ PEDOMAN ADAPTASI TULISAN:
 
     const academicFormattingRules = `
 STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
-1. STANDAR UKURAN FONT & TIPOGRAFI BAKU:
-   - Judul Utama Dokumen (Judul Skripsi/Makalah/Karya Tulis): Ukuran 16 pt, BOLD, Center.
-   - Judul Bab / Bagian Utama (BAB 1 / BAB I, DAFTAR ISI, DAFTAR PUSTAKA, KATA PENGANTAR, ABSTRAK): Ukuran 14 pt, BOLD.
-   - Sub-judul Desimal (1.1, 1.2, 2.1): Ukuran 12 pt, BOLD.
-   - Sub-sub-judul (1.1.1, 1.1.2): Ukuran 12 pt, BOLD.
+1. STANDAR UKURAN FONT & TIPOGRAFI RESMI SKRIPSI:
+   - Judul Utama Dokumen: Ukuran 16 pt, BOLD, Center, Huruf Kapital (Uppercase).
+   - Judul Bab / Bagian Utama (BAB I / BAB 1, DAFTAR ISI, DAFTAR PUSTAKA, KATA PENGANTAR, ABSTRAK): Ukuran 14 pt, BOLD, Center, Huruf Kapital.
+   - Sub-judul Desimal (1.1, 1.2, 2.1): Ukuran 12 pt, BOLD, Left, Title Case.
+   - Sub-sub-judul (1.1.1, 1.1.2): Ukuran 12 pt, BOLD, Left, Title Case.
    - Seluruh Isi Dokumen / Paragraf Teks Biasa: Ukuran 12 pt, NORMAL (tidak bold), RATA KANAN-KIRI (Justify), dan WAJIB diawali 1x Tab (~1.27 cm) pada awal kalimat alinea baru.
 
 2. PROTOKOL PARAGRAF BARU (WAJIB 1x TAB DI AWAL KALIMAT & RATA KIRI-KANAN):
    - Setiap awal paragraf baru (alinea isi teks dokumen) WAJIB diawali dengan 1x indentasi Tab pada awal kalimatnya (menjorok ~1.27 cm / 0.5 inci).
-   - FORMAT PENULISAN ALINEA WAJIB RATA KANAN-KIRI (JUSTIFIED). Dilarang menyusun naskah skripsi yang hanya rata kiri atau tidak rapi.
+   - FORMAT PENULISAN ALINEA WAJIB RATA KANAN-KIRI (JUSTIFIED). Dilarang keras menyusun naskah yang hanya rata kiri atau berantakan.
    - Dilarang membiarkan paragraf isi dokumen rata kiri tanpa indentasi alinea.
 
-3. HIERARKI JUDUL GOOGLE DOCS (JUDUL 1, JUDUL 2, JUDUL 3, DST.):
-   - Gunakan format hierarki terstandarisasi yang siap dipetakan ke gaya Google Docs:
-     * Judul Utama Dokumen: [JUDUL_DOKUMEN] (Ukuran 16 pt BOLD)
-     * Judul 1 (Heading 1): Gunakan format BAB Romawi/Arab kapital di baris baru, contoh:
-       [JUDUL_1] BAB 1 PENDAHULUAN (Ukuran 14 pt BOLD)
-       atau untuk bagian utama: [JUDUL_1] DAFTAR ISI, [JUDUL_1] DAFTAR PUSTAKA (Ukuran 14 pt BOLD)
-     * Judul 2 (Heading 2 / Sub-bab): Penomoran desimal dua digit, Title Case, contoh:
-       [JUDUL_2] 1.1 Latar Belakang Masalah (Ukuran 12 pt BOLD)
-       [JUDUL_2] 1.2 Rumusan Masalah (Ukuran 12 pt BOLD)
-     * Judul 3 (Heading 3 / Sub-subbab): Tiga digit desimal, Title Case, contoh:
-       [JUDUL_3] 1.1.1 Identifikasi Isu Strategis (Ukuran 12 pt BOLD)
-     * Judul 4 (Heading 4): Penomoran abjad kecil, contoh:
-       [JUDUL_4] a. Faktor Lingkungan Internal (Ukuran 12 pt BOLD)
-   - Dilarang memberikan indentasi Tab pada baris Judul.
+3. STRUKTUR FORMAT JUDUL ALAMI (DILARANG KERAS MENGGUNAKAN TAG MESIN):
+   - TULIS JUDUL SECARA MURNI DAN ALAMI SEPERTI MAHASISWA & DOSEN MENULIS SKRIPSI:
+     * Judul Utama Dokumen: Ditulis langsung di baris pertama dengan HURUF KAPITAL SEMUA (contoh: PENGARUH KUALITAS PELAYANAN TERHADAP KEPUASAN PELANGGAN).
+     * Judul Bab: Ditulis BAB 1 PENDAHULUAN atau BAB I PENDAHULUAN di baris baru dengan HURUF KAPITAL SEMUA.
+     * Sub-bab: Penomoran desimal resmi dua digit, Title Case (contoh: 1.1 Latar Belakang Masalah, 1.2 Rumusan Masalah).
+     * Sub-subbab: Tiga digit desimal, Title Case (contoh: 1.1.1 Identifikasi Isu Strategis).
+   - DILARANG KERAS mengeluarkan tag mesin seperti [JUDUL_1], [JUDUL_2], [JUDUL_DOKUMEN], atau simbol Markdown (#, ##, ###).
+   - Antara Bab, Subbab, dan Paragraf cukup satu kali baris baru normal. Dilarang membuat baris kosong ganda yang membuat dokumen tampak berantakan.
 
-4. STRUKTUR & TATA CARA PENYUSUNAN DAFTAR ISI (TABLE OF CONTENTS):
+4. STRUKTUR BAB 1 PENDAHULUAN BERSTANDAR AKADEMIK TINGGI (S1/S2):
+   - 1.1 Latar Belakang Masalah:
+     * Disusun minimal 3-4 alinea padat, berbobot, dan mengalir secara logis-deduktif.
+     * Alinea 1: Konteks luas, signifikansi topik, fenomena global/nasional.
+     * Alinea 2: Fakta empiris konkret, data riil, dan dinamika yang terjadi di lapangan.
+     * Alinea 3: Landasan teori pendukung, tinjauan riset terdahulu, dan research gap (kesenjangan masalah).
+     * Alinea 4: Urgensi dan alasan kuat mengapa penelitian ini wajib dilakukan.
+   - 1.2 Identifikasi Masalah:
+     * Butir-butir persoalan spesifik yang muncul dari telaah latar belakang.
+   - 1.3 Pembatasan Masalah:
+     * Ruang lingkup, variabel, dan subjek agar penelitian fokus dan terarah.
+   - 1.4 Rumusan Masalah:
+     * Pertanyaan penelitian yang tajam, spesifik, dan terukur.
+   - 1.5 Tujuan Penelitian:
+     * Sasaran konkret yang menjawab rumusan masalah.
+   - 1.6 Manfaat Penelitian:
+     * Manfaat teoretis bagi akademisi dan manfaat praktis bagi masyarakat/industri.
+
+5. STRUKTUR & TATA CARA PENYUSUNAN DAFTAR ISI (TABLE OF CONTENTS):
    - ATURAN MUTLAK: DILARANG KERAS MENGGUNAKAN INDENTASI TAB PADA DAFTAR ISI! Setiap baris daftar isi harus rata kiri (kecuali sub-bab yang diindentasi 2-4 spasi biasa), bukan tab alinea paragraf.
-   - Header DAFTAR ISI berukuran 14 pt BOLD.
-   - Baris entri daftar isi berukuran 12 pt NORMAL.
+   - Header DAFTAR ISI berukuran 14 pt BOLD, Center.
+   - Baris entri daftar isi berukuran 12 pt NORMAL, Left.
    - Susun entri bab dan sub-bab dengan perataan dot leaders (titik-titik pemimpin) rapi yang sejajar ke nomor halaman di sisi kanan:
      * Bagian Awal (Halaman Judul s.d. Daftar Gambar): menggunakan angka Romawi kecil (i, ii, iii, iv, v).
      * Bagian Isi (BAB 1 s.d. Bab Penutup & Daftar Pustaka): menggunakan angka Arab (1, 2, 3...).
      * Contoh penulisan rapi:
-       [JUDUL_1] DAFTAR ISI
+       DAFTAR ISI
        KATA PENGANTAR ............................................................. ii
        DAFTAR ISI ................................................................. iii
        BAB 1 PENDAHULUAN .......................................................... 1
@@ -87,13 +99,13 @@ STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
          2.1 Kajian Teoretis ...................................................... 6
        DAFTAR PUSTAKA ............................................................. 35
 
-5. ATURAN PENOMORAN HALAMAN ILMIAH (PAGE NUMBERING CONVENTIONS):
+6. ATURAN PENOMORAN HALAMAN ILMIAH (PAGE NUMBERING CONVENTIONS):
    - Bagian Awal (Preliminaries): Angka Romawi kecil (i, ii, iii...) di tengah bawah halaman.
    - Bagian Isi (Chapters): Angka Arab (1, 2, 3...) dengan ketentuan:
      * Halaman pertama setiap Bab baru: nomor diletakkan di TENGAH BAWAH.
      * Halaman lanjutan dalam bab yang sama: nomor diletakkan di KANAN ATAS.
 
-6. FORMAT DAFTAR PUSTAKA & SITASI ILMIAH BAKU (BIBLIOGRAPHY STANDARDS):
+7. FORMAT DAFTAR PUSTAKA & SITASI ILMIAH BAKU (BIBLIOGRAPHY STANDARDS):
    - Standar Utama: APA 7th Edition (atau sesuaikan jika pengguna meminta IEEE/Harvard/Chicago).
    - Susun alfabetis (A–Z) berdasarkan nama belakang penulis utama tanpa nomor urut angka.
    - Format penulisan baris: Hanging Indent (baris pertama rata kiri, baris kedua dan seterusnya menjorok 1x Tab).
@@ -102,11 +114,11 @@ STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
      Sugiyono. (2020). Metode Penelitian Kuantitatif, Kualitatif, dan R&D. Bandung: Alfabeta.
      Dharma, M. W., & Pratama, A. (2025). Analisis performa reproduksi komparatif. Jurnal Perikanan Tropis, 12(2), 145-156. https://doi.org/10.xxxx/xxxx
 
-7. FORMAT TABEL DAN GAMBAR:
+8. FORMAT TABEL DAN GAMBAR:
    - Judul Tabel: Diletakkan di ATAS tabel (contoh: Tabel 1.1 Distribusi Sampel Penelitian).
    - Judul Gambar/Grafik: Diletakkan di BAWAH gambar (contoh: Gambar 1.1 Diagram Alir Penelitian). Sumber dicantumkan di bawah judul gambar.
 
-8. NAVIGASI KURSOR & PERBAIKAN LOKASI SPESIFIK (SMART TARGETING):
+9. NAVIGASI KURSOR & PERBAIKAN LOKASI SPESIFIK (SMART TARGETING):
    - Jago selayaknya manusia menyusun skripsi: Ketika pengguna meminta perbaikan untuk bagian tertentu (misal: 'perbaiki bab 1', 'revisi latar belakang', 'perbaiki bagian atas'), GTyipe secara otomatis mengarahkan kursor dan fokus editor ke bagian dokumen tersebut sebelum mengeksekusi penulisan perbaikan.`;
 
     if (mode === "discuss") {
@@ -152,7 +164,7 @@ ATURAN FORMAT PENULISAN (MUTLAK):
 2. DILARANG KERAS MENGGUNAKAN SIMBOL MARKDOWN:
    - JANGAN gunakan tanda bintang asterisk (* atau **) sama sekali.
    - JANGAN gunakan backtick (\`) atau garis pembatas (---).
-   - Gunakan tag [JUDUL_1], [JUDUL_2], [JUDUL_3] untuk menandai tingkatan judul.
+   - Tulis judul secara alami: HURUF KAPITAL untuk Bab (BAB 1 PENDAHULUAN) dan desimal untuk Subbab (1.1 Latar Belakang Masalah). DILARANG menggunakan tag buatan seperti [JUDUL_1], [JUDUL_2].
    - Awali setiap alinea baru dengan 1x Tab (\\t).
 3. Kedalaman isi: Sajikan paragraf yang padat informasi, komprehensif, berbasis fakta dan teori ilmiah nyata.
 4. DILARANG MENGGUNAKAN EMOJI SAMA SEKALI.`;
@@ -193,7 +205,7 @@ ${originalText.trim()}
 
 Aturan:
 1. Hasilkan HANYA teks akhir hasil revisi yang siap langsung diketik ke dalam Google Docs, tanpa kalimat pembuka atau penutup.
-2. Gunakan tag [JUDUL_1], [JUDUL_2], [JUDUL_3] jika ada bagian judul.
+2. Tulis judul secara alami: HURUF KAPITAL untuk Bab (BAB 1) dan desimal untuk Subbab (1.1). Dilarang menggunakan tag [JUDUL_1], [JUDUL_2].
 3. Awali setiap alinea paragraf baru dengan 1x Tab (\\t).
 4. DILARANG menggunakan tanda bintang asterisk (* atau **) dan DILARANG menggunakan emoji sedikitpun.`;
   }

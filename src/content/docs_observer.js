@@ -90,7 +90,10 @@
         style.textContent = `
           div[class*="docsSpellWiz"],
           div[class*="SpellWiz"],
+          div[class*="spellwiz"],
           div[id*="docsSpellWiz"],
+          div[id*="SpellWiz"],
+          div[id*="av-WBCd"],
           .docsSpellWizCheckupSurface,
           .docsSpellWizCheckupSurfaceHeader,
           .docsSpellWizCheckupSurfaceOriginalWord,
@@ -101,6 +104,12 @@
           .kix-spell-bubble,
           .docs-bubble:has([class*="SpellWiz"]),
           .docs-bubble:has([class*="spell"]),
+          .docs-bubble:has([class*="Spell"]),
+          .docs-callout-bubble:has([class*="SpellWiz"]),
+          .docs-callout-bubble:has([class*="spell"]),
+          div:has(> .docsSpellWizCheckupSurface),
+          div:has(> [class*="SpellWiz"]),
+          div:has(> [class*="docsSpellWiz"]),
           div[aria-label*="Ejaan dan tata bahasa"],
           div[aria-label*="Spelling and grammar"],
           div[aria-label*="Saran ejaan"],
@@ -113,8 +122,11 @@
             top: -99999px !important;
             left: -99999px !important;
             z-index: -999999 !important;
+            width: 0 !important;
+            height: 0 !important;
             max-width: 0 !important;
             max-height: 0 !important;
+            clip: rect(0, 0, 0, 0) !important;
           }
         `;
         (doc.head || doc.documentElement).appendChild(style);
@@ -123,33 +135,63 @@
 
     ensureStyle(document);
 
-    function removeSpellElements(root = document) {
+    function dismissSpellPopups(root = document) {
       try {
+        const iframe = document.querySelector(".docs-texteventtarget-iframe");
+        if (iframe && iframe.contentDocument) {
+          ensureStyle(iframe.contentDocument);
+          if (iframe.contentDocument.body) {
+            iframe.contentDocument.body.setAttribute("spellcheck", "false");
+          }
+        }
+
         const elements = root.querySelectorAll(
-          '.docsSpellWizCheckupSurface, [class*="docsSpellWiz"], [class*="SpellWiz"], [id*="docsSpellWiz"]'
+          '.docsSpellWizCheckupSurface, [class*="docsSpellWiz"], [class*="SpellWiz"], [class*="spellwiz"], [id*="docsSpellWiz"], [id*="SpellWiz"], .docs-spell-bubble, .docs-spellcheck-bubble, div[aria-label*="Ejaan dan tata bahasa"], div[aria-label*="Spelling and grammar"]'
         );
+
         for (const el of elements) {
-          try { el.remove(); } catch { el.style.display = "none"; }
+          try {
+            const ignoreBtn = el.querySelector("button, [role='button']") ||
+                              el.closest("div")?.querySelector("button, [role='button']");
+            if (ignoreBtn && /abaikan|ignore/i.test(ignoreBtn.textContent || "")) {
+              ignoreBtn.click();
+            }
+
+            const container = el.closest(".docs-bubble, .docs-callout-bubble, div[role='dialog'], div[style*='z-index']") || el;
+            container.style.display = "none";
+            container.style.visibility = "hidden";
+            container.style.opacity = "0";
+            container.remove();
+          } catch {
+            try { el.remove(); } catch { el.style.display = "none"; }
+          }
         }
       } catch {}
     }
 
     try {
       const observer = new MutationObserver((mutations) => {
+        let hasSpell = false;
         for (const m of mutations) {
           for (const node of m.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const className = node.className || "";
               const id = node.id || "";
               if (
-                (typeof className === "string" && (className.includes("SpellWiz") || className.includes("docsSpellWiz"))) ||
-                (typeof id === "string" && id.includes("docsSpellWiz")) ||
-                node.querySelector?.('.docsSpellWizCheckupSurface, [class*="SpellWiz"]')
+                (typeof className === "string" && (className.includes("SpellWiz") || className.includes("docsSpellWiz") || className.includes("spell-bubble"))) ||
+                (typeof id === "string" && (id.includes("docsSpellWiz") || id.includes("SpellWiz") || id.includes("av-WBCd"))) ||
+                (node.textContent && node.textContent.includes("Ejaan dan tata bahasa")) ||
+                node.querySelector?.('.docsSpellWizCheckupSurface, [class*="SpellWiz"], [class*="docsSpellWiz"]')
               ) {
-                try { node.remove(); } catch { node.style.display = "none"; }
+                hasSpell = true;
+                const container = node.closest(".docs-bubble, .docs-callout-bubble, div[role='dialog'], div[style*='z-index']") || node;
+                try { container.remove(); } catch { container.style.display = "none"; }
               }
             }
           }
+        }
+        if (hasSpell) {
+          dismissSpellPopups();
         }
       });
 
@@ -161,12 +203,8 @@
 
     setInterval(() => {
       ensureStyle(document);
-      removeSpellElements();
-      const iframe = document.querySelector(".docs-texteventtarget-iframe");
-      if (iframe && iframe.contentDocument) {
-        ensureStyle(iframe.contentDocument);
-      }
-    }, 1500);
+      dismissSpellPopups();
+    }, 600);
   }
 
   initSpellCheckSuppressor();

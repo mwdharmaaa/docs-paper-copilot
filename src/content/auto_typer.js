@@ -80,18 +80,11 @@
       s = s.replace(/<<<DRAF_DOKUMEN>>>/g, "");
       s = s.replace(/<<<AKHIR_DRAF_DOKUMEN>>>/g, "");
 
-      // 1. Standarisasi header Markdown ke tag format hierarki judul GTyipe
-      s = s.replace(/^[ \t]*#\s+(.*)$/gm, "[JUDUL_1] $1");
-      s = s.replace(/^[ \t]*##\s+(.*)$/gm, "[JUDUL_2] $1");
-      s = s.replace(/^[ \t]*###\s+(.*)$/gm, "[JUDUL_3] $1");
-      s = s.replace(/^[ \t]*####\s+(.*)$/gm, "[JUDUL_4] $1");
+      // 1. Bersihkan tag mesin jika ada: [JUDUL_DOKUMEN], [JUDUL_1], [JUDUL_2], dsb.
+      s = s.replace(/\[(?:JUDUL_\d|H\d|JUDUL_DOKUMEN|TITLE|JUDUL_UTAMA|SUBJUDUL)\]\s*/gi, "");
 
-      // 2. PASTIKAN SETIAP JUDUL TERPISAH DUA BARIS DARI TEKS ISI:
-      // Mencegah judul dan kalimat pertama paragraf tergabung dalam satu blok,
-      // sehingga kalimat pertama paragraf DIJAMIN 100% menerima 1x Tab indent!
-      s = s.replace(/^(\[(?:JUDUL_\d|H\d|JUDUL_DOKUMEN|TITLE|SUBJUDUL)[^\]]*\].*?)\r?\n(?!\r?\n)/gim, "$1\n\n");
-      s = s.replace(/^(BAB\s+(?:[IVXLCDM]+|\d+).*?)\r?\n(?!\r?\n)/gim, "$1\n\n");
-      s = s.replace(/^(\d+\.\d+\.?\s+[A-Z].*?)\r?\n(?!\r?\n)/gm, "$1\n\n");
+      // 2. Bersihkan penanda header Markdown (#, ##, ###, dst.)
+      s = s.replace(/^[ \t]*#+\s+(.*)$/gm, "$1");
 
       // 3. Hapus markdown code block markers
       s = s.replace(/^```[a-zA-Z]*\r?\n/gm, "");
@@ -117,7 +110,7 @@
     },
 
     /**
-     * Mengatur ketebalan huruf (Bold / Unbold).
+     * Mengatur status tebal huruf (Bold / Unbold).
      */
     setBold(shouldBeBold, target = null, iframe = null) {
       try {
@@ -145,10 +138,22 @@
         if (isBold !== Boolean(shouldBeBold)) {
           if (boldBtn && typeof boldBtn.click === "function") {
             boldBtn.click();
-          } else {
-            const tgt = target || this.getEditorTarget();
-            if (tgt) {
-              tgt.dispatchEvent(new KeyboardEvent("keydown", {
+          }
+
+          const tgt = target || this.getEditorTarget();
+          const eventTargets = [
+            tgt,
+            ifr?.contentDocument?.body,
+            ifr?.contentDocument,
+            ifr?.contentWindow,
+            document.activeElement,
+            document,
+            window
+          ].filter(Boolean);
+
+          for (const t of eventTargets) {
+            try {
+              t.dispatchEvent(new KeyboardEvent("keydown", {
                 key: "b",
                 code: "KeyB",
                 keyCode: 66,
@@ -158,7 +163,7 @@
                 cancelable: true,
                 composed: true
               }));
-              tgt.dispatchEvent(new KeyboardEvent("keyup", {
+              t.dispatchEvent(new KeyboardEvent("keyup", {
                 key: "b",
                 code: "KeyB",
                 keyCode: 66,
@@ -168,7 +173,7 @@
                 cancelable: true,
                 composed: true
               }));
-            }
+            } catch {}
           }
         }
       } catch (err) {
@@ -177,150 +182,60 @@
     },
 
     /**
-     * Mengatur Ukuran Font Google Docs (16pt, 14pt, 12pt).
-     * Bekerja tangguh baik saat toolbar normal maupun menciut/collapsed ke tombol 'Lainnya'.
+     * Kirimkan perintah kenaikan atau penurunan ukuran font Google Docs per 1 pt.
+     * Menggunakan kombinasi pintasan keyboard Docs universal dan tombol toolbar:
+     * - Inc: Ctrl+Shift+. (Period)
+     * - Dec: Ctrl+Shift+, (Comma)
      */
-    setFontSize(sizePt) {
-      const pt = parseInt(sizePt, 10);
-      if (!pt || isNaN(pt)) return false;
-
-      const sizeSelectors = [
-        "#fontSizeSelect input",
-        "div[id*='fontSizeSelect'] input",
-        ".docs-font-size-inc-dec-combobox input",
-        "#fontSizeInputElement",
-        "[aria-label*='Ukuran font'] input",
-        "[aria-label*='Font size'] input",
-        ".docs-font-size-select input",
-        "input.goog-toolbar-combo-button-input"
-      ];
-
-      function trySetInput(root = document) {
-        for (const sel of sizeSelectors) {
-          try {
-            const input = root.querySelector(sel);
-            if (input) {
-              const currentVal = parseInt(input.value || input.getAttribute("value"), 10);
-              if (currentVal === pt) return true;
-
-              input.focus();
-              input.value = String(pt);
-              input.dispatchEvent(new Event("input", { bubbles: true }));
-              input.dispatchEvent(new Event("change", { bubbles: true }));
-              input.dispatchEvent(new KeyboardEvent("keydown", {
-                key: "Enter",
-                code: "Enter",
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true
-              }));
-              input.dispatchEvent(new KeyboardEvent("keyup", {
-                key: "Enter",
-                code: "Enter",
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true
-              }));
-              return true;
-            }
-          } catch {}
-        }
-        return false;
-      }
-
-      // 1. Coba pencarian input langsung di toolbar
-      if (trySetInput(document)) {
-        this.focusEditor();
-        return true;
-      }
-
-      // 2. Buka menu overflow 'Lainnya' / 'More' jika toolbar Google Docs menciut
-      try {
-        const moreBtn =
-          document.getElementById("moreButton") ||
-          document.querySelector(".docs-toolbar-more-bubble") ||
-          document.querySelector("div[aria-label*='Lainnya']") ||
-          document.querySelector("div[aria-label*='More']") ||
-          document.querySelector("[id*='moreButton']");
-
-        if (moreBtn && typeof moreBtn.click === "function") {
-          moreBtn.click();
-          if (trySetInput(document)) {
-            this.focusEditor();
-            return true;
-          }
-        }
-      } catch {}
-
-      // 3. Fallback: execCommand fontSize di iframe document (skala 1..7)
-      try {
-        const ifr = this.getEditorIframe();
-        if (ifr && ifr.contentDocument) {
-          const sizeMap = { 10: 1, 11: 2, 12: 3, 14: 4, 16: 5, 18: 6 };
-          const cmdVal = sizeMap[pt] || 3;
-          ifr.contentDocument.execCommand("fontSize", false, String(cmdVal));
-        }
-      } catch {}
-
-      this.focusEditor();
-      return false;
-    },
-
-    /**
-     * Memastikan teks kembali ke standar normal (12 pt, unbold).
-     */
-    ensureNormalFont(target = null, iframe = null) {
-      this.setBold(false, target, iframe);
-      this.setFontSize(12);
-    },
-
-    /**
-     * Terapkan Format Rata Kiri-Kanan (Justify Alignment: Ctrl+Shift+J).
-     * Bekerja tangguh bahkan jika toolbar Google Docs menciut/collapsed.
-     */
-    applyJustifyAlignment(target = null, iframe = null) {
+    stepFontSize(direction = "inc", target = null, iframe = null) {
       const tgt = target || this.getEditorTarget();
       const ifr = iframe || this.getEditorIframe();
+      const isInc = direction === "inc";
 
-      // 1. Eksekusi perintah native justifyFull di contentDocument iframe
-      if (ifr && ifr.contentDocument) {
-        try {
-          ifr.contentDocument.execCommand("justifyFull", false, null);
-        } catch {}
-      }
+      const keyChar = isInc ? ">" : "<";
+      const rawChar = isInc ? "." : ",";
+      const codeStr = isInc ? "Period" : "Comma";
+      const keyCodeNum = isInc ? 190 : 188;
 
-      // 2. Dispatch shortcut Ctrl+Shift+J ke semua target aktif dokumen & window
       const eventTargets = [
-        ifr?.contentWindow,
-        ifr?.contentDocument,
-        ifr?.contentDocument?.body,
         tgt,
+        ifr?.contentDocument?.body,
+        ifr?.contentDocument,
+        ifr?.contentWindow,
         document.activeElement,
-        document.body,
+        document,
         window
       ].filter(Boolean);
 
       for (const t of eventTargets) {
         try {
           t.dispatchEvent(new KeyboardEvent("keydown", {
-            key: "J",
-            code: "KeyJ",
-            keyCode: 74,
-            which: 74,
+            key: keyChar,
+            code: codeStr,
+            keyCode: keyCodeNum,
+            which: keyCodeNum,
             ctrlKey: true,
             shiftKey: true,
             bubbles: true,
             cancelable: true,
             composed: true
           }));
-
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: rawChar,
+            code: codeStr,
+            keyCode: keyCodeNum,
+            which: keyCodeNum,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
           t.dispatchEvent(new KeyboardEvent("keyup", {
-            key: "J",
-            code: "KeyJ",
-            keyCode: 74,
-            which: 74,
+            key: keyChar,
+            code: codeStr,
+            keyCode: keyCodeNum,
+            which: keyCodeNum,
             ctrlKey: true,
             shiftKey: true,
             bubbles: true,
@@ -330,57 +245,197 @@
         } catch {}
       }
 
-      // 3. Klik tombol Justify (baik di toolbar utama maupun menu overflow 'Lainnya' / 'More')
+      // Coba klik tombol toolbar jika ada
       try {
-        let justifyBtn =
-          document.getElementById("alignJustify") ||
-          document.querySelector("[aria-label*='Rata kanan kiri']") ||
-          document.querySelector("[aria-label*='Justify']") ||
-          document.querySelector("[id*='alignJustify']") ||
-          document.querySelector(".docs-icon-align-justify")?.closest("[role='button']");
+        const btnSelector = isInc
+          ? "#fontSizeIncrement, [aria-label*='Besarkan ukuran font'], [aria-label*='Increase font size'], .docs-font-size-inc-button"
+          : "#fontSizeDecrement, [aria-label*='Kecilkan ukuran font'], [aria-label*='Decrease font size'], .docs-font-size-dec-button";
+        const btn = document.querySelector(btnSelector);
+        if (btn && typeof btn.click === "function") {
+          btn.click();
+        }
+      } catch {}
+    },
 
-        if (!justifyBtn) {
-          const moreBtn =
-            document.getElementById("moreButton") ||
-            document.querySelector(".docs-toolbar-more-bubble") ||
-            document.querySelector("div[aria-label*='Lainnya']") ||
-            document.querySelector("div[aria-label*='More']") ||
-            document.querySelector("[id*='moreButton']");
+    /**
+     * Mengatur Ukuran Font Google Docs secara akurat dari currentPt ke targetPt.
+     * Standar Protokol:
+     * - Judul Utama: 16 pt
+     * - Judul Bab (BAB 1, DAFTAR ISI): 14 pt
+     * - Sub-judul (1.1, 1.1.1): 12 pt
+     * - Seluruh Teks Isi Paragraf: 12 pt
+     */
+    changeFontSize(targetPt, currentPt = 12, target = null, iframe = null) {
+      const tgtPt = parseInt(targetPt, 10) || 12;
+      const curPt = parseInt(currentPt, 10) || 12;
+      const diff = tgtPt - curPt;
 
-          if (moreBtn && typeof moreBtn.click === "function") {
-            moreBtn.click();
-            justifyBtn =
-              document.getElementById("alignJustify") ||
-              document.querySelector("[aria-label*='Rata kanan kiri']") ||
-              document.querySelector("[aria-label*='Justify']");
-            if (justifyBtn && typeof justifyBtn.click === "function") {
-              justifyBtn.click();
-            }
-          }
-        } else if (typeof justifyBtn.click === "function") {
+      if (diff > 0) {
+        for (let s = 0; s < diff; s++) {
+          this.stepFontSize("inc", target, iframe);
+        }
+      } else if (diff < 0) {
+        for (let s = 0; s < Math.abs(diff); s++) {
+          this.stepFontSize("dec", target, iframe);
+        }
+      }
+
+      // Sinkronisasi input toolbar jika tersedia
+      try {
+        const input = document.querySelector(
+          "#fontSizeSelect input, .docs-font-size-inc-dec-combobox input, #fontSizeInputElement"
+        );
+        if (input) {
+          input.value = String(tgtPt);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          input.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            bubbles: true
+          }));
+        }
+      } catch {}
+
+      return tgtPt;
+    },
+
+    /**
+     * Alias backward-compatible setFontSize
+     */
+    setFontSize(sizePt, target = null, iframe = null) {
+      return this.changeFontSize(sizePt, 12, target, iframe);
+    },
+
+    /**
+     * Terapkan Perataan Paragraf Google Docs:
+     * - Center: Ctrl+Shift+E (Judul Utama & Judul Bab)
+     * - Left: Ctrl+Shift+L (Sub-bab & Entri Daftar Isi)
+     * - Justify: Ctrl+Shift+J (Paragraf Isi Rata Kanan-Kiri)
+     */
+    applyAlignment(align = "justify", target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+
+      const config = {
+        center: {
+          key: "E", code: "KeyE", keyCode: 69,
+          cmd: "justifyCenter",
+          btnSelectors: ["#alignCenter", "[aria-label*='Rata tengah']", "[aria-label*='Center align']", ".docs-icon-align-center"]
+        },
+        left: {
+          key: "L", code: "KeyL", keyCode: 76,
+          cmd: "justifyLeft",
+          btnSelectors: ["#alignLeft", "[aria-label*='Rata kiri']", "[aria-label*='Left align']", ".docs-icon-align-left"]
+        },
+        justify: {
+          key: "J", code: "KeyJ", keyCode: 74,
+          cmd: "justifyFull",
+          btnSelectors: ["#alignJustify", "[aria-label*='Rata kanan kiri']", "[aria-label*='Justify']", ".docs-icon-align-justify"]
+        }
+      }[align] || {
+        key: "J", code: "KeyJ", keyCode: 74,
+        cmd: "justifyFull",
+        btnSelectors: ["#alignJustify", "[aria-label*='Rata kanan kiri']", "[aria-label*='Justify']", ".docs-icon-align-justify"]
+      };
+
+      // 1. Eksekusi native command di iframe
+      if (ifr && ifr.contentDocument) {
+        try { ifr.contentDocument.execCommand(config.cmd, false, null); } catch {}
+      }
+
+      // 2. Dispatch shortcut Google Docs ke semua target dokumen
+      const eventTargets = [
+        tgt,
+        ifr?.contentDocument?.body,
+        ifr?.contentDocument,
+        ifr?.contentWindow,
+        document.activeElement,
+        document,
+        window
+      ].filter(Boolean);
+
+      for (const t of eventTargets) {
+        try {
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: config.key,
+            code: config.code,
+            keyCode: config.keyCode,
+            which: config.keyCode,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+          t.dispatchEvent(new KeyboardEvent("keyup", {
+            key: config.key,
+            code: config.code,
+            keyCode: config.keyCode,
+            which: config.keyCode,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+        } catch {}
+      }
+
+      // 3. Klik tombol perataan toolbar jika ada
+      try {
+        let btn = null;
+        for (const sel of config.btnSelectors) {
+          btn = document.querySelector(sel);
+          if (btn) break;
+        }
+        if (btn && typeof btn.click === "function") {
           const isChecked =
-            justifyBtn.getAttribute("aria-pressed") === "true" ||
-            justifyBtn.getAttribute("aria-checked") === "true" ||
-            justifyBtn.classList.contains("goog-toolbar-button-checked") ||
-            justifyBtn.classList.contains("docs-material-button-checked");
-
+            btn.getAttribute("aria-pressed") === "true" ||
+            btn.getAttribute("aria-checked") === "true" ||
+            btn.classList.contains("goog-toolbar-button-checked") ||
+            btn.classList.contains("docs-material-button-checked");
           if (!isChecked) {
-            justifyBtn.click();
+            btn.click();
           }
         }
-      } catch (e) {
-        console.warn("[AutoTyper] Justify button click:", e);
-      }
+      } catch {}
 
       return true;
     },
 
+    applyJustifyAlignment(target = null, iframe = null) {
+      return this.applyAlignment("justify", target, iframe);
+    },
+
+    /**
+     * Memastikan teks kembali ke standar normal (12 pt, unbold, Justified).
+     */
+    ensureNormalFont(target = null, iframe = null) {
+      this.setBold(false, target, iframe);
+      this.applyAlignment("justify", target, iframe);
+    },
+
+    /**
+     * Menghilangkan popup spellcheck Google Docs jika sempat muncul.
+     */
+    dismissSpellPopup() {
+      try {
+        const popups = document.querySelectorAll(
+          '.docsSpellWizCheckupSurface, [class*="docsSpellWiz"], [class*="SpellWiz"], [id*="docsSpellWiz"], .docs-spell-bubble'
+        );
+        for (const p of popups) {
+          const container = p.closest(".docs-bubble, .docs-callout-bubble, div[role='dialog']") || p;
+          container.style.display = "none";
+          container.remove();
+        }
+      } catch {}
+    },
+
     /**
      * Terapkan Format Judul Google Docs (Heading 1..6 / Normal Text)
-     * - Ctrl+Alt+1: Judul 1 (Heading 1)
-     * - Ctrl+Alt+2: Judul 2 (Heading 2)
-     * - Ctrl+Alt+3: Judul 3 (Heading 3)
-     * - Ctrl+Alt+0: Teks Normal (Normal Text)
      */
     applyHeading(level = 0, target = null, iframe = null) {
       const tgt = target || this.getEditorTarget();
@@ -650,12 +705,93 @@
       }
     },
 
+    /**
+     * Memeriksa apakah suatu baris merupakan judul akademik (Bab, Sub-bab, atau Judul Utama).
+     */
+    isHeadingLine(line) {
+      if (!line || typeof line !== "string") return false;
+      const trimmed = line.trim();
+      if (trimmed.length === 0) return false;
+
+      // Tag eksplisit jika ada
+      if (/^\[(?:JUDUL_\d|H\d|JUDUL_DOKUMEN|TITLE|JUDUL_UTAMA|SUBJUDUL)\]/i.test(trimmed)) {
+        return true;
+      }
+
+      // Bab: BAB 1, BAB 2, BAB I, BAB II
+      if (/^BAB\s+(?:[IVXLCDM]+|\d+)(?:\s+.*)?$/i.test(trimmed)) {
+        return true;
+      }
+
+      // Bagian Utama Dokumen: DAFTAR ISI, DAFTAR PUSTAKA, dsb.
+      if (/^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|KATA\s+PENGANTAR|ABSTRAK|RINGKASAN|DAFTAR\s+TABEL|DAFTAR\s+GAMBAR|LAMPIRAN)$/i.test(trimmed)) {
+        return true;
+      }
+
+      // Sub-bab desimal: 1.1 Latar Belakang, 2.1 bla bla
+      if (/^\d+\.\d+\.?\s+[A-Z]/.test(trimmed)) {
+        return true;
+      }
+
+      // Sub-sub-bab desimal: 1.1.1 Identifikasi Masalah
+      if (/^\d+\.\d+\.\d+\.?\s+[A-Z]/.test(trimmed)) {
+        return true;
+      }
+
+      // Poin sub-bab abjad tunggal: a. Faktor Internal, b. Faktor Eksternal
+      if (/^[a-z]\.\s+[A-Z]/.test(trimmed)) {
+        return true;
+      }
+
+      // Judul Dokumen Utama: Baris huruf kapital semua tanpa titik di akhir, panjang >= 15 karakter
+      if (/^[A-Z0-9\s,:()\-]{15,}$/.test(trimmed) && !/[a-z]/.test(trimmed) && !/\.\s*$/.test(trimmed)) {
+        return true;
+      }
+
+      return false;
+    },
+
+    /**
+     * Memecah draf menjadi unit-unit penulisan mandiri.
+     * Setiap Judul (Dokumen, Bab, Sub-bab) dan setiap Alinea Paragraf
+     * diisolasi menjadi entitas tersendiri, menjamin indentasi 1x Tab
+     * dan format tipografi selalu 100% konsisten.
+     */
     splitIntoParagraphs(text) {
       if (!text || typeof text !== "string") return [];
-      if (/\r?\n\s*\r?\n/.test(text)) {
-        return text.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).filter(Boolean);
+      const lines = text.split(/\r?\n/);
+      const paragraphs = [];
+      let currentBody = [];
+
+      const flushBody = () => {
+        if (currentBody.length > 0) {
+          const bodyStr = currentBody.join(" ").trim();
+          if (bodyStr.length > 0) {
+            paragraphs.push(bodyStr);
+          }
+          currentBody = [];
+        }
+      };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) {
+          flushBody();
+          continue;
+        }
+
+        const isHeading = this.isHeadingLine(line);
+        const isToc = this.isTableOfContentsLine(line);
+
+        if (isHeading || isToc) {
+          flushBody();
+          paragraphs.push(line);
+        } else {
+          currentBody.push(line);
+        }
       }
-      return text.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
+      flushBody();
+      return paragraphs;
     },
 
     /**
@@ -679,82 +815,72 @@
     },
 
     /**
-     * Menganalisis tingkat judul, ukuran font, dan status tebal (bold).
+     * Menganalisis tingkat judul, ukuran font, perataan, dan status tebal (bold).
+     * Standar Resmi:
+     * - Judul Utama Dokumen: 16 pt, BOLD, Center
+     * - Judul Bab / Bagian Utama (BAB 1, DAFTAR ISI): 14 pt, BOLD, Center
+     * - Sub-judul (1.1, 1.2): 12 pt, BOLD, Left
+     * - Sub-sub-judul (1.1.1): 12 pt, BOLD, Left
+     * - Seluruh Teks Isi Paragraf: 12 pt, NORMAL (unbold), Justify
      */
     parseLineHeading(rawLine) {
       if (!rawLine || typeof rawLine !== "string") {
-        return { level: 0, text: "", isHeading: false, fontSize: 12, isBold: false };
+        return { level: 0, text: "", isHeading: false, fontSize: 12, isBold: false, align: "justify" };
       }
 
-      const trimmed = rawLine.trim();
+      let text = rawLine.trim();
 
-      // 1. Tag Eksplisit
-      let m = trimmed.match(/^\[(?:JUDUL_DOKUMEN|TITLE|JUDUL_UTAMA)\]\s*(.*)$/i);
-      if (m) {
-        // Judul Utama: 16 pt, BOLD
-        return { level: 1, text: m[1].trim(), isHeading: true, isDocTitle: true, fontSize: 16, isBold: true };
+      // Deteksi tag eksplisit
+      const isExplicitDocTitle = /^\[(?:JUDUL_DOKUMEN|TITLE|JUDUL_UTAMA)\]/i.test(text);
+      const isExplicitBab = /^\[(?:JUDUL_1|H1)\]/i.test(text);
+      const isExplicitSub = /^\[(?:JUDUL_2|H2|SUBJUDUL)\]/i.test(text);
+      const isExplicitSubSub = /^\[(?:JUDUL_3|H3|JUDUL_4|H4)\]/i.test(text);
+
+      text = text.replace(/^\[(?:JUDUL_\d|H\d|JUDUL_DOKUMEN|TITLE|JUDUL_UTAMA|SUBJUDUL)\]\s*/i, "").trim();
+
+      // 1. Judul Utama Dokumen: 16 pt, BOLD, Center
+      if (
+        isExplicitDocTitle ||
+        (/^BAB\s+/i.test(text) === false &&
+         /^[A-Z0-9\s,:()\-]{15,}$/.test(text) &&
+         !/[a-z]/.test(text) &&
+         !/\.\s*$/.test(text))
+      ) {
+        return { level: 1, isDocTitle: true, isHeading: true, fontSize: 16, isBold: true, align: "center", text };
       }
 
-      m = trimmed.match(/^\[(?:JUDUL_1|H1)\]\s*(.*)$/i);
-      if (m) {
-        // Judul Bab: 14 pt, BOLD
-        return { level: 1, text: m[1].trim(), isHeading: true, fontSize: 14, isBold: true };
+      // 2. Judul Bab / Bagian Utama (BAB 1, DAFTAR ISI, DAFTAR PUSTAKA): 14 pt, BOLD, Center
+      if (
+        isExplicitBab ||
+        /^BAB\s+(?:[IVXLCDM]+|\d+)(?:\s+.*)?$/i.test(text) ||
+        /^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|KATA\s+PENGANTAR|ABSTRAK|RINGKASAN|DAFTAR\s+TABEL|DAFTAR\s+GAMBAR|LAMPIRAN)$/i.test(text)
+      ) {
+        return { level: 1, isDocTitle: false, isHeading: true, fontSize: 14, isBold: true, align: "center", text };
       }
 
-      m = trimmed.match(/^\[(?:JUDUL_2|H2)\]\s*(.*)$/i);
-      if (m) {
-        // Sub-judul: 12 pt, BOLD
-        return { level: 2, text: m[1].trim(), isHeading: true, fontSize: 12, isBold: true };
+      // 3. Sub-judul desimal (1.1 Latar Belakang): 12 pt, BOLD, Left
+      if (isExplicitSub || /^\d+\.\d+\.?\s+[A-Z]/.test(text)) {
+        return { level: 2, isHeading: true, fontSize: 12, isBold: true, align: "left", text };
       }
 
-      m = trimmed.match(/^\[(?:JUDUL_3|H3)\]\s*(.*)$/i);
-      if (m) {
-        // Sub-sub-judul: 12 pt, BOLD
-        return { level: 3, text: m[1].trim(), isHeading: true, fontSize: 12, isBold: true };
+      // 4. Sub-sub-judul (1.1.1): 12 pt, BOLD, Left
+      if (isExplicitSubSub || /^\d+\.\d+\.\d+\.?\s+[A-Z]/.test(text) || /^[a-z]\.\s+[A-Z]/.test(text)) {
+        return { level: 3, isHeading: true, fontSize: 12, isBold: true, align: "left", text };
       }
 
-      m = trimmed.match(/^\[(?:JUDUL_4|H4)\]\s*(.*)$/i);
-      if (m) {
-        return { level: 4, text: m[1].trim(), isHeading: true, fontSize: 12, isBold: true };
-      }
-
-      m = trimmed.match(/^\[SUBJUDUL\]\s*(.*)$/i);
-      if (m) {
-        return { level: 2, text: m[1].trim(), isHeading: true, fontSize: 12, isBold: true };
-      }
-
-      // 2. Deteksi Konvensi Akademik Otomatis
-      // BAB 1, BAB 2, BAB I, BAB II (14 pt, BOLD)
-      if (/^BAB\s+(?:[IVXLCDM]+|\d+)(\s+.*)?$/i.test(trimmed)) {
-        return { level: 1, text: trimmed, isHeading: true, fontSize: 14, isBold: true };
-      }
-
-      // DAFTAR ISI, DAFTAR PUSTAKA, KATA PENGANTAR, ABSTRAK (14 pt, BOLD)
-      if (/^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|KATA\s+PENGANTAR|ABSTRAK|RINGKASAN|DAFTAR\s+TABEL|DAFTAR\s+GAMBAR|LAMPIRAN)$/i.test(trimmed)) {
-        return { level: 1, text: trimmed, isHeading: true, fontSize: 14, isBold: true };
-      }
-
-      // Sub-judul desimal: 1.1 Latar Belakang, 2.1 bla bla (12 pt, BOLD)
-      if (/^\d+\.\d+\s+[A-Z]/.test(trimmed)) {
-        return { level: 2, text: trimmed, isHeading: true, fontSize: 12, isBold: true };
-      }
-
-      // Sub-sub-judul: 1.1.1 Identifikasi Masalah (12 pt, BOLD)
-      if (/^\d+\.\d+\.\d+\s+[A-Z]/.test(trimmed)) {
-        return { level: 3, text: trimmed, isHeading: true, fontSize: 12, isBold: true };
-      }
-
-      // Paragraf biasa / isi dokumen (12 pt, NORMAL / UNBOLD)
-      return { level: 0, text: rawLine, isHeading: false, fontSize: 12, isBold: false };
+      // 5. Paragraf biasa / isi dokumen (12 pt, NORMAL / UNBOLD, Justify)
+      return { level: 0, text, isHeading: false, fontSize: 12, isBold: false, align: "justify" };
     },
 
     /**
      * PROTOKOL UTAMA: Langsung Selesai Satu Draf (Instant Whole Draft)
      * Mengintegrasikan:
-     * - Ukuran font: Judul Utama (16 pt bold), Bab (14 pt bold), Sub-judul (12 pt bold), Isi (12 pt normal)
-     * - Indentasi 1x Tab di setiap paragraf baru
+     * - Ukuran font: Judul Utama (16 pt bold, Center), Bab (14 pt bold, Center), Sub-judul (12 pt bold, Left), Isi (12 pt normal, Justify)
+     * - Indentasi 1x Tab (~1.27 cm) di setiap awal paragraf baru
      * - Format Rata Kanan-Kiri (Justify)
      * - Daftar Isi bebas tab
+     * - Bebas popup spellcheck
+     * - Resilient terhadap batas halaman (anti-cutoff)
      */
     async typeDraft(rawText, options = {}) {
       const {
@@ -777,12 +903,11 @@
       }
 
       this.focusEditor();
-      this.ensureNormalFont();
       await new Promise((res) => setTimeout(res, 40));
       this.focusEditor();
 
-      const target = this.getEditorTarget();
-      const iframe = this.getEditorIframe();
+      let target = this.getEditorTarget();
+      let iframe = this.getEditorIframe();
       if (!target) {
         this.isTyping = false;
         if (onError) onError("Target editor Google Docs tidak ditemukan.");
@@ -799,9 +924,19 @@
         return true;
       }
 
-      // Terapkan default dokumen Rata Kanan-Kiri (Justify) dan ukuran 12 pt
-      this.applyJustifyAlignment();
-      this.setFontSize(12);
+      // Deteksi ukuran font awal dokumen (biasanya 11pt di Google Docs baru)
+      let currentPt = 11;
+      if (window.PageLearner && typeof window.PageLearner.detectFontSize === "function") {
+        const detected = parseInt(window.PageLearner.detectFontSize(), 10);
+        if (detected && !isNaN(detected)) {
+          currentPt = detected;
+        }
+      }
+
+      // Standarisasi awal naskah: Bawa ukuran font ke 12pt, unbold, dan Rata Kanan-Kiri (Justify)
+      currentPt = this.changeFontSize(12, currentPt, target, iframe);
+      this.setBold(false, target, iframe);
+      this.applyAlignment("justify", target, iframe);
 
       let inTocBlock = false;
 
@@ -817,122 +952,101 @@
         // Sangat krusial saat teks melintasi batas halaman (page break / pagination)
         // di mana kanvas Docs mereposisi atau mendetach node target sebelumnya.
         this.focusEditor();
-        let target = this.getEditorTarget();
-        let iframe = this.getEditorIframe();
+        target = this.getEditorTarget();
+        iframe = this.getEditorIframe();
 
-        const p = paragraphs[i];
-        const lines = p.split(/\r?\n/);
+        const block = paragraphs[i].trim();
+        if (!block) continue;
 
-        for (let l = 0; l < lines.length; l++) {
-          if (this.abortRequested) break;
+        // Tutup jika ada popup spellcheck yang muncul
+        this.dismissSpellPopup();
 
-          const rawLine = lines[l].trim();
-          if (!rawLine) continue;
+        // Deteksi status blok Daftar Isi
+        if (/^DAFTAR\s+ISI/i.test(block)) {
+          inTocBlock = true;
+        } else if (inTocBlock && /^BAB\s+(?:[IVXLCDM]+|\d+)/i.test(block)) {
+          inTocBlock = false;
+        }
 
-          // Deteksi apakah sedang dalam blok Daftar Isi
-          if (/^\[?(?:JUDUL_1|H1)?\]?\s*DAFTAR\s+ISI/i.test(rawLine)) {
-            inTocBlock = true;
-          } else if (inTocBlock && /^\[?(?:JUDUL_1|H1)?\]?\s*BAB\s+(?:[IVXLCDM]+|\d+)/i.test(rawLine)) {
-            inTocBlock = false;
-          }
+        const hInfo = this.parseLineHeading(block);
+        const isTocLine = inTocBlock || this.isTableOfContentsLine(block);
 
-          const hInfo = this.parseLineHeading(rawLine);
-          const isTocLine = inTocBlock || this.isTableOfContentsLine(rawLine);
+        if (hInfo.isHeading && !isTocLine) {
+          // ========================================================
+          // EKSEKUSI FORMAT JUDUL (HEADINGS):
+          // - Judul Dokumen Utama: 16 pt, BOLD, Center
+          // - Judul Bab (BAB 1 / KATA PENGANTAR): 14 pt, BOLD, Center
+          // - Sub-judul (1.1): 12 pt, BOLD, Left
+          // - Sub-sub-judul (1.1.1): 12 pt, BOLD, Left
+          // ========================================================
+          currentPt = this.changeFontSize(hInfo.fontSize, currentPt, target, iframe);
+          this.setBold(true, target, iframe);
+          this.applyAlignment(hInfo.align || "center", target, iframe);
 
-          if (hInfo.isHeading && hInfo.level > 0 && !isTocLine) {
-            // ========================================================
-            // EKSEKUSI FORMAT JUDUL:
-            // - Judul Utama: 16 pt BOLD
-            // - Judul Bab (BAB 1 / DAFTAR ISI): 14 pt BOLD
-            // - Sub-judul (1.1): 12 pt BOLD
-            // - Sub-sub-judul (1.1.1): 12 pt BOLD
-            // ========================================================
-            if (hInfo.level === 1 && hInfo.isDocTitle) {
-              this.applyHeading(1, target, iframe);
-              this.setFontSize(16);
-              this.setBold(true, target, iframe);
-            } else if (hInfo.level === 1) {
-              this.applyHeading(1, target, iframe);
-              this.setFontSize(14);
-              this.setBold(true, target, iframe);
-            } else if (hInfo.level === 2) {
-              // Sub-judul (1.1): Terapkan Teks Normal + BOLD 12pt
-              // agar ukuran font tidak membengkak ke 18pt bawaan Google Docs Heading 2
-              this.applyHeading(0, target, iframe);
-              this.setFontSize(12);
-              this.setBold(true, target, iframe);
-            } else {
-              // Sub-sub-judul (1.1.1): 12 pt BOLD
-              this.applyHeading(0, target, iframe);
-              this.setFontSize(12);
-              this.setBold(true, target, iframe);
-            }
+          // Ketik teks judul ke Google Docs
+          await this.typeText(hInfo.text, target, iframe);
 
-            // Ketik teks judul ke Google Docs
-            await this.typeText(hInfo.text, target, iframe);
+          // Baris baru setelah judul
+          this.insertNewline(target, iframe);
 
-            if (l < lines.length - 1 || i < total - 1) {
-              this.insertNewline(target, iframe);
-              // Kembalikan ke Normal Text (12 pt, unbold, Rata Kanan-Kiri) untuk baris berikutnya
-              this.applyHeading(0, target, iframe);
-              this.ensureNormalFont(target, iframe);
-              this.applyJustifyAlignment(target, iframe);
-            }
-          } else if (isTocLine) {
-            // ========================================================
-            // EKSEKUSI BARIS DAFTAR ISI (TABLE OF CONTENTS)
-            // Header Daftar Isi: 14 pt BOLD
-            // Baris entri daftar isi: 12 pt NORMAL, BEBAS DARI INDENTASI TAB
-            // ========================================================
-            const isTocHeader = /^\[?(?:JUDUL_1|H1)?\]?\s*DAFTAR\s+ISI/i.test(rawLine);
-            if (isTocHeader) {
-              this.applyHeading(1, target, iframe);
-              this.setFontSize(14);
-              this.setBold(true, target, iframe);
-            } else {
-              this.applyHeading(0, target, iframe);
-              this.setFontSize(12);
-              this.setBold(false, target, iframe);
-            }
-
-            const cleanTocText = rawLine.replace(/^\[(?:JUDUL_\d|H\d)\]\s*/i, "");
-            await this.typeText(cleanTocText, target, iframe);
-
-            if (l < lines.length - 1) {
-              this.insertNewline(target, iframe);
-            }
+          // Kembalikan ke standar teks isi (12 pt, unbold, Justified)
+          currentPt = this.changeFontSize(12, currentPt, target, iframe);
+          this.setBold(false, target, iframe);
+          this.applyAlignment("justify", target, iframe);
+        } else if (isTocLine) {
+          // ========================================================
+          // EKSEKUSI BARIS DAFTAR ISI (TABLE OF CONTENTS)
+          // Header Daftar Isi: 14 pt BOLD, Center
+          // Baris entri daftar isi: 12 pt NORMAL, Left, BEBAS TAB!
+          // ========================================================
+          const isTocHeader = /^DAFTAR\s+ISI/i.test(block);
+          if (isTocHeader) {
+            currentPt = this.changeFontSize(14, currentPt, target, iframe);
+            this.setBold(true, target, iframe);
+            this.applyAlignment("center", target, iframe);
           } else {
-            // ========================================================
-            // EKSEKUSI PARAGRAF BIASA / ISI DOKUMEN
-            // - Ukuran font: 12 pt
-            // - Format font: NORMAL (unbold)
-            // - Format alinea: RATA KANAN-KIRI (Justify)
-            // - Indentasi: Wajib 1x Tab (7 non-breaking spaces) pada awal kalimat alinea baru
-            // ========================================================
-            this.applyHeading(0, target, iframe);
-            this.setFontSize(12);
+            currentPt = this.changeFontSize(12, currentPt, target, iframe);
             this.setBold(false, target, iframe);
-            this.applyJustifyAlignment(target, iframe);
-
-            const isList = /^[-*•]\s+/.test(hInfo.text) || /^\d+\.\s+/.test(hInfo.text);
-            let textToType = hInfo.text;
-
-            if (textToType.startsWith("\t")) {
-              textToType = textToType.replace(/^\t+/, "");
-            }
-
-            // Sisipkan 1x Tab jika baris pertama alinea dan bukan daftar poin
-            if (l === 0 && !isList && textToType.length > 0) {
-              this.insertTab(target, iframe);
-            }
-
-            // Ketik teks alinea menggunakan sequence event keyboard asli Docs
-            await this.typeText(textToType, target, iframe);
-
-            if (l < lines.length - 1) {
-              this.insertNewline(target, iframe);
-            }
+            this.applyAlignment("left", target, iframe);
           }
+
+          const cleanTocText = block.replace(/^\[(?:JUDUL_\d|H\d)\]\s*/i, "").trim();
+          await this.typeText(cleanTocText, target, iframe);
+
+          this.insertNewline(target, iframe);
+
+          // Kembalikan ke standar teks isi jika selesai baris TOC
+          currentPt = this.changeFontSize(12, currentPt, target, iframe);
+          this.setBold(false, target, iframe);
+          this.applyAlignment("justify", target, iframe);
+        } else {
+          // ========================================================
+          // EKSEKUSI PARAGRAF BIASA / ISI DOKUMEN:
+          // - Ukuran font: 12 pt
+          // - Format font: NORMAL (unbold)
+          // - Format alinea: RATA KANAN-KIRI (Justify)
+          // - Indentasi: WAJIB 1x TAB (~1.27 cm) di awal kalimat pertama
+          // ========================================================
+          currentPt = this.changeFontSize(12, currentPt, target, iframe);
+          this.setBold(false, target, iframe);
+          this.applyAlignment("justify", target, iframe);
+
+          const isList = /^[-*•]\s+/.test(block) || /^\d+\.\s+/.test(block);
+          let textToType = block;
+
+          if (textToType.startsWith("\t")) {
+            textToType = textToType.replace(/^\t+/, "");
+          }
+
+          // WAJIB 1x Tab pada awal paragraf baru jika bukan daftar poin
+          if (!isList && textToType.length > 0) {
+            this.insertTab(target, iframe);
+          }
+
+          // Ketik teks alinea menggunakan sequence event keyboard asli Docs
+          await this.typeText(textToType, target, iframe);
+
+          this.insertNewline(target, iframe);
         }
 
         const percent = Math.round(((i + 1) / total) * 100);
@@ -946,13 +1060,9 @@
           });
         }
 
-        // Pemisahan alinea draf
-        if (i < total - 1) {
-          this.insertNewline(target, iframe);
-          // Jeda singkat (45ms) agar kanvas Google Docs memiliki waktu melakukan
-          // reflow layout & pagination halaman baru tanpa mengabaikan input berikutnya
-          await new Promise((res) => setTimeout(res, 45));
-        }
+        // Jeda singkat (45ms) antar unit agar kanvas Google Docs
+        // selesai mereflow layout dan pagination tanpa lag
+        await new Promise((res) => setTimeout(res, 45));
       }
 
       this.isTyping = false;

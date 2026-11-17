@@ -27,11 +27,15 @@
 ---
 
 ## 3. Standar Ukuran Font & Tipografi Resmi (Baku Skripsi)
-* **Judul Utama Dokumen**: Ukuran **16 pt, BOLD**.
-* **Judul Bab / Bagian Utama** (`BAB 1` / `BAB I`, `DAFTAR ISI`, `DAFTAR PUSTAKA`, `KATA PENGANTAR`, dsb.): Ukuran **14 pt, BOLD**.
-* **Sub-judul Desimal** (`1.1`, `1.2`, `2.1`, dsb.): Ukuran **12 pt, BOLD**.
-* **Sub-sub-judul** (`1.1.1`, `1.1.2`, dsb.): Ukuran **12 pt, BOLD**.
-* **Seluruh Teks Isi Dokumen / Paragraf Normal**: Ukuran **12 pt, NORMAL (tidak bold)**, berformat **Rata Kanan-Kiri (Justify)**, dan diawali **1x Tab** per alinea baru.
+* **Judul Utama Dokumen**: Ukuran **16 pt, BOLD, Center** (Huruf Kapital Semua).
+* **Judul Bab / Bagian Utama** (`BAB 1` / `BAB I`, `DAFTAR ISI`, `DAFTAR PUSTAKA`, `KATA PENGANTAR`, dsb.): Ukuran **14 pt, BOLD, Center** (Huruf Kapital Semua).
+* **Sub-judul Desimal** (`1.1`, `1.2`, `2.1`, dsb.): Ukuran **12 pt, BOLD, Left** (Title Case).
+* **Sub-sub-judul** (`1.1.1`, `1.1.2`, dsb.): Ukuran **12 pt, BOLD, Left** (Title Case).
+* **Seluruh Teks Isi Dokumen / Paragraf Normal**: Ukuran **12 pt, NORMAL (tidak bold)**, berformat **Rata Kanan-Kiri (Justify)**, dan wajib diawali **1x Tab** (~1.27 cm) per alinea baru.
+* **Mekanisme Penyesuaian Font Google Docs**:
+  * Menggunakan sistem stepper pintasan universal Docs `Ctrl + Shift + .` (Increase 1 pt) dan `Ctrl + Shift + ,` (Decrease 1 pt) serta sinkronisasi tombol `#fontSizeIncrement` / `#fontSizeDecrement`, sehingga ukuran font tidak bergantung pada input toolbar yang rawan menciut saat layar dibagi dengan panel GTyipe.
+  * Setiap judul diisolasi menjadi satu baris/unit mandiri dan tidak pernah digabungkan ke baris paragraf berikutnya, memastikan kalimat pertama alinea selalu menerima 1x Tab secara utuh.
+  * Jarak vertikal antar-elemen (Bab ke Subbab, Subbab ke Alinea, Alinea ke Alinea) diatur tepat 1x baris baru (single newline) agar dokumen rapi dan elegan layaknya skripsi asli.
 
 ---
 
