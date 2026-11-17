@@ -796,33 +796,87 @@
     },
 
     /**
-     * Mengetikkan teks secara cepat dan andal ke Google Docs menggunakan event keyboard asli.
-     * Dilengkapi deteksi koneksi DOM otomatis (isConnected) dan pemulihan fokus
-     * agar tidak pernah terhenti atau terpotong saat terjadi page break / pagination!
+     * Memasukkan satu kesatuan string / teks langsung secara instan (0 ms, Langsung Jadi).
+     * Mengeksekusi event beforeinput, execCommand, dan Simulated Paste dengan payload penuh
+     * sehingga seluruh alinea atau judul langsung jadi tanpa pengetikan per beberapa kata.
+     */
+    insertChunk(str, target = null, iframe = null) {
+      if (!str || typeof str !== "string") return true;
+
+      let tgt = target || this.getEditorTarget();
+      let ifr = iframe || this.getEditorIframe();
+      if (!tgt) return false;
+
+      try {
+        // 1. Dispatch beforeinput dengan payload string penuh
+        tgt.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: str,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        // 2. Eksekusi execCommand insertText pada editor iframe
+        let inserted = false;
+        if (ifr && ifr.contentDocument) {
+          try {
+            inserted = Boolean(ifr.contentDocument.execCommand("insertText", false, str));
+          } catch {}
+        }
+
+        // 3. Fallback: Simulated Paste dengan DataTransfer jika execCommand tidak merespons
+        if (!inserted) {
+          try {
+            const dt = new DataTransfer();
+            dt.setData("text/plain", str);
+            const pasteEvt = new ClipboardEvent("paste", {
+              clipboardData: dt,
+              bubbles: true,
+              cancelable: true,
+              composed: true
+            });
+            tgt.dispatchEvent(pasteEvt);
+            inserted = true;
+          } catch {}
+        }
+
+        // 4. Dispatch input event dengan payload string penuh
+        tgt.dispatchEvent(new InputEvent("input", {
+          inputType: "insertText",
+          data: str,
+          bubbles: true,
+          cancelable: false,
+          composed: true
+        }));
+
+        return inserted;
+      } catch (err) {
+        console.warn("[AutoTyper] insertChunk error:", err);
+        return false;
+      }
+    },
+
+    /**
+     * Mengetikkan teks secara instan ke Google Docs (Langsung Jadi).
+     * Memasukkan seluruh string sekaligus tanpa pengetikan per karakter / per beberapa kata.
      */
     async typeText(text, target = null, iframe = null) {
       if (!text || typeof text !== "string") return true;
 
+      // Prioritas 1: Langsung masukkan seluruh blok teks sekaligus (Instant Execution, 0 ms)
+      const success = this.insertChunk(text, target, iframe);
+      if (success) {
+        return true;
+      }
+
+      // Prioritas 2 (Ultra-fast fallback): Jika browser membutuhkan per-karakter, ketik tanpa jeda
       const chars = Array.from(text);
       for (let c = 0; c < chars.length; c++) {
         if (this.abortRequested) break;
-
-        // Pastikan target masih terhubung ke DOM kanvas Docs
-        let tgt = target;
-        let ifr = iframe;
-        if (!tgt || !tgt.isConnected) {
-          this.focusEditor();
-          tgt = this.getEditorTarget();
-          ifr = this.getEditorIframe();
-        }
-
+        let tgt = target || this.getEditorTarget();
+        let ifr = iframe || this.getEditorIframe();
         this.insertChar(chars[c], tgt, ifr);
-
-        // Jeda sangat singkat (2 ms) setiap 35 karakter agar thread render Google Docs
-        // dapat memproses event tanpa drop event dan tanpa lag
-        if (c > 0 && c % 35 === 0) {
-          await new Promise((res) => setTimeout(res, 2));
-        }
       }
       return true;
     },
@@ -1269,9 +1323,8 @@
           });
         }
 
-        // Jeda singkat (45ms) antar unit agar kanvas Google Docs
-        // selesai mereflow layout dan pagination tanpa lag
-        await new Promise((res) => setTimeout(res, 45));
+        // Jeda mikro (0 ms) hanya untuk yielding event loop agar update tampilan instan dan secepat kilat
+        await new Promise((res) => setTimeout(res, 0));
       }
 
       this.isTyping = false;

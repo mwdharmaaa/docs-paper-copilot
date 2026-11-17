@@ -9,11 +9,11 @@
 ---
 
 ## 1. Definisi Protokol Resmi: Langsung Selesai Satu Draf (Instant Whole Draft)
-* **Perilaku Standar**: Sekali pengguna menekan tombol *"Ketik Otomatis ke Docs"*, *"Insert"*, atau menggunakan pembuat naskah inline (`Alt+G`), seluruh naskah/draf dokumen dimasukkan ke halaman kanvas Google Docs secara **langsung dalam satu proses selesai (instant execution)** tanpa risiko terputus di tengah jalan (*anti-cutoff*).
-* **Mekanisme Event Keyboard Asli Google Docs (`typeText`)**: Kanvas Google Docs mewajibkan rangkaian event keyboard browser lengkap (`keydown`, `keypress`, `beforeinput`, `input`, `keyup`) per karakter agar terdaftar ke dalam *text buffer* editor kanvas. Injeksi teks dieksekusi secara cepat dengan micro-batching (2 ms per 35 karakter) dan auto-reconnect target node DOM (`!tgt.isConnected`), mencegah hilangnya teks dan menghindari pemutusan di batas halaman (*page break*).
-* **Proteksi Batas Halaman (Pagination Resilience)**: Sebelum memproses alinea baru, GTyipe memanggil `focusEditor()` dan memperbarui referensi node target aktif secara dinamis (`getEditorTarget()`), serta memberikan jeda mikro layout (45 ms) antar paragraf agar kanvas Google Docs selesai membuat halaman baru tanpa memblokir input berikutnya.
-* **Jeda Karakter (`charDelayMs`)**: **0 ms** (tidak ada pengetikan lambat per huruf).
-* **Jeda Antar-Paragraf (`paragraphDelayMs`)**: **0 ms** (hanya jeda mikro layout 45 ms untuk pagination render Google Docs).
+* **Perilaku Standar**: Sekali pengguna menekan tombol *"Ketik Otomatis ke Docs"*, *"Insert"*, atau menggunakan pembuat naskah inline (`Alt+G`), seluruh naskah/draf dokumen dimasukkan ke halaman kanvas Google Docs secara **instan dan langsung jadi (instant execution, 0 ms)** tanpa proses pengetikan per beberapa kata yang lambat.
+* **Mekanisme Injeksi Instan (`insertChunk`)**: Setiap judul dan alinea paragraf dimasukkan ke dalam buffer Google Docs dalam satu payload penuh melalui rangkaian `beforeinput` payload, `execCommand("insertText")`, dan Simulated Paste DataTransfer. Seluruh kalimat dalam alinea muncul sekaligus dalam sekejap mata.
+* **Proteksi Batas Halaman (Pagination Resilience)**: Sebelum memproses alinea baru, GTyipe memanggil `focusEditor()` dan memperbarui referensi node target aktif secara dinamis (`getEditorTarget()`), dengan jeda mikro-yield (0 ms) agar pembaruan layout dokumen terjadi secepat kilat.
+* **Jeda Karakter (`charDelayMs`)**: **0 ms** (tidak ada pengetikan lambat per huruf/kata).
+* **Jeda Antar-Paragraf (`paragraphDelayMs`)**: **0 ms** (langsung jadi seketika).
 * **Penanganan Toolbar Ciut (Responsive Fallback)**: Saat toolbar Google Docs menciut karena pembagian layar dengan panel GTyipe, sistem secara otomatis mengakses tombol overflow *"Lainnya"* (`#moreButton` / `.docs-toolbar-more-bubble`) serta mengeksekusi pintasan keyboard dokumen (`Ctrl+Shift+J` untuk Justify, `Ctrl+Alt+1/0` untuk judul) sehingga format dokumen tetap 100% konsisten.
 
 ---
