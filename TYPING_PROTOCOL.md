@@ -32,10 +32,12 @@
 * **Sub-judul Desimal** (`1.1`, `1.2`, `2.1`, dsb.): Ukuran **12 pt, BOLD, Left** (Title Case).
 * **Sub-sub-judul** (`1.1.1`, `1.1.2`, dsb.): Ukuran **12 pt, BOLD, Left** (Title Case).
 * **Seluruh Teks Isi Dokumen / Paragraf Normal**: Ukuran **12 pt, NORMAL (tidak bold)**, berformat **Rata Kanan-Kiri (Justify)**, dan wajib diawali **1x Tab** (~1.27 cm) per alinea baru.
-* **Mekanisme Penyesuaian Font Google Docs**:
-  * Menggunakan sistem stepper pintasan universal Docs `Ctrl + Shift + .` (Increase 1 pt) dan `Ctrl + Shift + ,` (Decrease 1 pt) serta sinkronisasi tombol `#fontSizeIncrement` / `#fontSizeDecrement`, sehingga ukuran font tidak bergantung pada input toolbar yang rawan menciut saat layar dibagi dengan panel GTyipe.
-  * Setiap judul diisolasi menjadi satu baris/unit mandiri dan tidak pernah digabungkan ke baris paragraf berikutnya, memastikan kalimat pertama alinea selalu menerima 1x Tab secara utuh.
-  * Jarak vertikal antar-elemen (Bab ke Subbab, Subbab ke Alinea, Alinea ke Alinea) diatur tepat 1x baris baru (single newline) agar dokumen rapi dan elegan layaknya skripsi asli.
+* **Mekanisme Penyesuaian Font Google Docs (Stateful & Anti-Drift)**:
+  * **Pencegahan Tabrakan Selector Zoom**: Selector font size secara ketat merujuk `#fontSizeInputElement` dan scoped container `#fontSizeSelect`, DILARANG KERAS menggunakan generic combobox selector (`input.goog-toolbar-combo-button-input`) yang menyebabkan tabrakan dengan dropdown zoom `100%`.
+  * **Sistem State-Guarded Controller (`currentFontSize`)**: `AutoTyper` menyimpan state ukuran aktif di memori. Jika elemen berikutnya membutuhkan ukuran font yang sama (misal teks alinea isi 12 pt setelah sub-judul 12 pt), sistem langsung melakukan *no-op* (zero-action) tanpa memicu klik tombol atau event berulang, mencegah akumulasi font size yang melesat ke 19 pt / 20 pt.
+  * **Auto-Kalibrasi Awal ke 12 pt (`calibrateTo12`)**: Pada awal setiap pengetikan draf naskah, sistem membaca ukuran font aktif dokumen dan langsung menyelaraskannya ke standar baku 12 pt menggunakan input langsung `#fontSizeInputElement` dan tombol stepper `#fontSizeDecrement`/`#fontSizeIncrement`.
+  * **Isolasi Delta Ukuran Judul**: Judul Utama (16 pt) dan Judul Bab (14 pt) diubah secara presisi hanya untuk satu baris judul bersangkutan, lalu baris kosong berikutnya secara instan dikembalikan ke standar teks isi 12 pt, unbold, dan Justified.
+  * **Jarak Vertikal Standar**: Jarak vertikal antar-elemen (Bab ke Subbab, Subbab ke Alinea, Alinea ke Alinea) diatur tepat 1x baris baru (single newline) agar dokumen rapi dan elegan layaknya skripsi asli.
 
 ---
 

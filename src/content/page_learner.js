@@ -79,47 +79,75 @@
      * Detect font size of active text or dominant body paragraphs.
      */
     detectFontSize() {
-      // 1. Try Google Docs toolbar font size input
+      // 1. Selector ID langsung elemen input font size Docs (#fontSizeInputElement)
+      const directInput = document.getElementById("fontSizeInputElement");
+      if (directInput) {
+        const val = parseInt(directInput.value || directInput.getAttribute("value"), 10);
+        if (val && !isNaN(val) && val >= 6 && val <= 100) {
+          return `${val}pt`;
+        }
+      }
+
+      // 2. Toolbar scoped font size input (DILARANG query generic combo button agar tidak salah baca zoom 100%)
       const sizeSelectors = [
         "#fontSizeSelect input",
         "div[id*='fontSizeSelect'] input",
+        ".docs-font-size-inc-dec-combobox input",
         "[aria-label*='Ukuran font'] input",
-        "[aria-label*='Font size'] input",
-        "#fontSizeSelect",
-        ".docs-font-size-select input"
+        "[aria-label*='Font size'] input"
       ];
 
       for (const sel of sizeSelectors) {
         try {
           const el = document.querySelector(sel);
           if (el) {
-            const val = el.value || el.innerText || el.textContent;
-            if (val && !isNaN(parseFloat(val))) {
-              return parseFloat(val) + "pt";
+            const val = parseInt(el.value || el.innerText || el.textContent, 10);
+            if (val && !isNaN(val) && val >= 6 && val <= 100) {
+              return `${val}pt`;
             }
           }
         } catch {}
       }
 
-      // 2. Sample computed style from text spans
+      // 3. Frequency histogram sampling from text spans (mencari ukuran dominan alinea isi)
       const textSpans = document.querySelectorAll(
         ".kix-lineview-text-block span, .kix-word-htmlelement, .kix-paragraphrenderer span"
       );
+      const sizeCounts = {};
+      let checked = 0;
 
       for (const span of textSpans) {
         const text = span.textContent?.trim();
-        if (text && text.length > 10) {
+        if (text && text.length > 5) {
           try {
             const fs = window.getComputedStyle(span).fontSize;
             if (fs) {
               const px = parseFloat(fs);
               if (px > 0) {
                 const pt = Math.round(px * 0.75);
-                return `${pt}pt`;
+                if (pt >= 8 && pt <= 72) {
+                  sizeCounts[pt] = (sizeCounts[pt] || 0) + 1;
+                  checked++;
+                  if (checked >= 30) break;
+                }
               }
             }
           } catch {}
         }
+      }
+
+      let dominantSize = 12;
+      let maxCount = 0;
+      for (const [ptStr, count] of Object.entries(sizeCounts)) {
+        const countNum = parseInt(count, 10);
+        if (countNum > maxCount) {
+          maxCount = countNum;
+          dominantSize = parseInt(ptStr, 10);
+        }
+      }
+
+      if (maxCount > 0) {
+        return `${dominantSize}pt`;
       }
 
       return "12pt";

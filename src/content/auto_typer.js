@@ -20,6 +20,9 @@
   const AutoTyper = {
     isTyping: false,
     abortRequested: false,
+    currentFontSize: null,
+    currentBold: null,
+    currentAlign: null,
 
     getEditorIframe() {
       return (
@@ -137,6 +140,11 @@
      */
     setBold(shouldBeBold, target = null, iframe = null) {
       try {
+        const targetBool = Boolean(shouldBeBold);
+        if (this.currentBold === targetBool) {
+          return;
+        }
+
         const boldBtn = document.getElementById("boldButton") ||
                         document.querySelector(".docs-material-button[id*='bold']") ||
                         document.querySelector("[aria-label*='Tebal']") ||
@@ -158,9 +166,9 @@
                    boldBtn.classList.contains("docs-material-button-checked");
         }
 
-        if (isBold !== Boolean(shouldBeBold)) {
-          if (boldBtn && typeof boldBtn.click === "function") {
-            boldBtn.click();
+        if (isBold !== targetBool) {
+          if (boldBtn) {
+            this.clickElement(boldBtn);
           }
 
           const tgt = target || this.getEditorTarget();
@@ -189,165 +197,273 @@
             } catch {}
           }
         }
+        this.currentBold = targetBool;
       } catch (err) {
         console.warn("[AutoTyper] setBold error:", err);
       }
     },
 
     /**
+     * Helper untuk mengklik elemen kontrol Docs dengan rangkaian pointer/mouse event lengkap.
+     * Menjamin Google Closure Component mendeteksi interaksi tombol secara andal.
+     */
+    clickElement(el) {
+      if (!el) return false;
+      try {
+        const rect = el.getBoundingClientRect();
+        const clientX = rect.left + Math.max(1, rect.width / 2);
+        const clientY = rect.top + Math.max(1, rect.height / 2);
+        const opts = {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX,
+          clientY
+        };
+        el.dispatchEvent(new PointerEvent("pointerdown", opts));
+        el.dispatchEvent(new MouseEvent("mousedown", opts));
+        el.dispatchEvent(new PointerEvent("pointerup", opts));
+        el.dispatchEvent(new MouseEvent("mouseup", opts));
+        el.dispatchEvent(new MouseEvent("click", opts));
+        if (typeof el.click === "function") {
+          el.click();
+        }
+        return true;
+      } catch {
+        try {
+          if (typeof el.click === "function") {
+            el.click();
+            return true;
+          }
+        } catch {}
+      }
+      return false;
+    },
+
+    /**
      * Membaca ukuran font aktif secara nyata dari toolbar Google Docs.
+     * MENGGUNAKAN SELECTOR KHUSUS FONT SIZE (DILARANG query generic combo button agar tidak salah baca zoom 100%!).
      */
     getActualFontSize() {
       try {
-        const input = document.querySelector(
-          "#fontSizeInputElement, .docs-font-size-inc-dec-combobox input, #fontSizeSelect input, input.goog-toolbar-combo-button-input"
+        // 1. Selector ID langsung elemen input font size (standar Google Docs)
+        const directInput = document.getElementById("fontSizeInputElement");
+        if (directInput) {
+          const val = parseInt(directInput.value || directInput.getAttribute("value"), 10);
+          if (val && !isNaN(val) && val >= 6 && val <= 100) return val;
+        }
+
+        // 2. Input yang scoped di dalam container font size Docs
+        const scopedInput = document.querySelector(
+          "#fontSizeSelect input, .docs-font-size-inc-dec-combobox input, [id*='fontSize'] input"
         );
-        if (input) {
-          const val = parseInt(input.value || input.getAttribute("value"), 10);
-          if (val && !isNaN(val)) return val;
+        if (scopedInput) {
+          const val = parseInt(scopedInput.value || scopedInput.getAttribute("value"), 10);
+          if (val && !isNaN(val) && val >= 6 && val <= 100) return val;
         }
-        if (window.PageLearner && typeof window.PageLearner.detectFontSize === "function") {
-          const val = parseInt(window.PageLearner.detectFontSize(), 10);
-          if (val && !isNaN(val)) return val;
+
+        // 3. Baca teks container combo button font size
+        const fontContainer = document.getElementById("fontSizeSelect") ||
+                              document.querySelector(".docs-font-size-inc-dec-combobox");
+        if (fontContainer) {
+          const txt = fontContainer.textContent || fontContainer.innerText || "";
+          const m = txt.match(/\b(\d{1,2})\b/);
+          if (m) {
+            const val = parseInt(m[1], 10);
+            if (val >= 6 && val <= 100) return val;
+          }
         }
-      } catch {}
+
+        // 4. Fallback ke state internal jika sudah ada
+        if (this.currentFontSize && !isNaN(this.currentFontSize)) {
+          return this.currentFontSize;
+        }
+      } catch (err) {
+        console.warn("[AutoTyper] getActualFontSize warning:", err);
+      }
       return 12;
     },
 
     /**
-     * Mengatur Ukuran Font Google Docs secara presisi ke targetPt (16, 14, atau 12).
-     * Memanfaatkan input langsung toolbar dan tombol +/- tanpa risiko double-step.
+     * Input langsung angka font size ke input toolbar Google Docs (#fontSizeInputElement).
      */
-    changeFontSize(targetPt, currentPt = null, target = null, iframe = null) {
+    setDirectFontSizeInput(targetPt) {
+      try {
+        const input = document.getElementById("fontSizeInputElement") ||
+                      document.querySelector("#fontSizeSelect input, .docs-font-size-inc-dec-combobox input");
+        if (!input) return false;
+
+        input.focus();
+        if (typeof input.select === "function") {
+          input.select();
+        }
+
+        try {
+          document.execCommand("selectAll", false, null);
+          document.execCommand("insertText", false, String(targetPt));
+        } catch {}
+
+        input.value = String(targetPt);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        const enterOpts = {
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          which: 13,
+          bubbles: true,
+          cancelable: true
+        };
+        input.dispatchEvent(new KeyboardEvent("keydown", enterOpts));
+        input.dispatchEvent(new KeyboardEvent("keypress", enterOpts));
+        input.dispatchEvent(new KeyboardEvent("keyup", enterOpts));
+
+        return true;
+      } catch (err) {
+        console.warn("[AutoTyper] setDirectFontSizeInput warning:", err);
+        return false;
+      }
+    },
+
+    /**
+     * Kirimkan pintasan keyboard universal Google Docs untuk menaikkan/menurunkan ukuran font 1 pt.
+     * Inc: Ctrl+Shift+. (Period / >)
+     * Dec: Ctrl+Shift+, (Comma / <)
+     */
+    sendFontStepShortcut(direction = "inc", target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+      const isInc = direction === "inc";
+
+      const keyChar = isInc ? ">" : "<";
+      const codeStr = isInc ? "Period" : "Comma";
+      const keyCodeNum = isInc ? 190 : 188;
+
+      const eventTargets = [
+        tgt,
+        ifr?.contentDocument?.body,
+        ifr?.contentDocument,
+        ifr?.contentWindow
+      ].filter(Boolean);
+
+      for (const t of eventTargets) {
+        try {
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: keyChar,
+            code: codeStr,
+            keyCode: keyCodeNum,
+            which: keyCodeNum,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+          t.dispatchEvent(new KeyboardEvent("keyup", {
+            key: keyChar,
+            code: codeStr,
+            keyCode: keyCodeNum,
+            which: keyCodeNum,
+            ctrlKey: true,
+            shiftKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+        } catch {}
+      }
+    },
+
+    /**
+     * Mengatur Ukuran Font Google Docs secara presisi ke targetPt (16, 14, atau 12).
+     * Mencegah runaway drift: jika sudah di ukuran target, langsung no-op.
+     */
+    async changeFontSize(targetPt, target = null, iframe = null) {
       const tgtPt = parseInt(targetPt, 10) || 12;
-      const actualNow = this.getActualFontSize();
-      if (actualNow === tgtPt) {
+
+      // 0. State Guard: jika state internal sudah di target, JANGAN SENTUH APAPUN!
+      if (this.currentFontSize === tgtPt) {
         return tgtPt;
       }
 
-      // 1. Coba input langsung pada combobox font size toolbar Google Docs
-      try {
-        const input = document.querySelector(
-          "#fontSizeInputElement, .docs-font-size-inc-dec-combobox input, #fontSizeSelect input, input.goog-toolbar-combo-button-input"
-        );
-        if (input) {
-          input.focus();
-          input.value = String(tgtPt);
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-          input.dispatchEvent(new KeyboardEvent("keydown", {
-            key: "Enter",
-            code: "Enter",
-            keyCode: 13,
-            which: 13,
-            bubbles: true
-          }));
-          input.dispatchEvent(new KeyboardEvent("keyup", {
-            key: "Enter",
-            code: "Enter",
-            keyCode: 13,
-            which: 13,
-            bubbles: true
-          }));
+      // 1. Cek toolbar nyata
+      const actualNow = this.getActualFontSize();
+      if (actualNow === tgtPt) {
+        this.currentFontSize = tgtPt;
+        return tgtPt;
+      }
 
-          const updated = this.getActualFontSize();
-          if (updated === tgtPt) {
-            this.focusEditor();
-            return tgtPt;
+      const cur = (this.currentFontSize && !isNaN(this.currentFontSize)) ? this.currentFontSize : actualNow;
+      const diff = tgtPt - cur;
+
+      // 2. Jalankan Direct Input ke input box Docs
+      this.setDirectFontSizeInput(tgtPt);
+      await new Promise((r) => setTimeout(r, 25));
+
+      const afterDirect = this.getActualFontSize();
+      if (afterDirect === tgtPt) {
+        this.currentFontSize = tgtPt;
+        this.focusEditor();
+        return tgtPt;
+      }
+
+      // 3. Fallback: Gunakan tombol Increment (+) atau Decrement (-) serta keyboard shortcut
+      if (diff !== 0) {
+        const isInc = diff > 0;
+        const btnId = isInc ? "fontSizeIncrement" : "fontSizeDecrement";
+        const btn = document.getElementById(btnId) ||
+                    document.querySelector(isInc
+                      ? "[aria-label*='Besarkan ukuran font'], [aria-label*='Increase font size'], .docs-font-size-inc-button"
+                      : "[aria-label*='Kecilkan ukuran font'], [aria-label*='Decrease font size'], .docs-font-size-dec-button");
+
+        const steps = Math.abs(diff);
+        for (let s = 0; s < steps; s++) {
+          let clicked = false;
+          if (btn) {
+            clicked = this.clickElement(btn);
+          }
+          if (!clicked) {
+            this.sendFontStepShortcut(isInc ? "inc" : "dec", target, iframe);
           }
         }
-      } catch {}
+      }
 
-      // 2. Jika input langsung belum mengubah, gunakan tombol Increment (+) atau Decrement (-)
-      try {
-        const cur = this.getActualFontSize();
-        const diff = tgtPt - cur;
-        if (diff !== 0) {
-          const isInc = diff > 0;
-          const btnSelector = isInc
-            ? "#fontSizeIncrement, [aria-label*='Besarkan ukuran font'], [aria-label*='Increase font size'], .docs-font-size-inc-button"
-            : "#fontSizeDecrement, [aria-label*='Kecilkan ukuran font'], [aria-label*='Decrease font size'], .docs-font-size-dec-button";
-          const btn = document.querySelector(btnSelector);
-
-          if (btn && typeof btn.click === "function") {
-            const steps = Math.abs(diff);
-            for (let s = 0; s < steps; s++) {
-              btn.click();
-            }
-            this.focusEditor();
-            return tgtPt;
-          }
-
-          // 3. Fallback: Shortcut keyboard universal Docs HANYA ke target editor kanvas
-          const tgt = target || this.getEditorTarget();
-          if (tgt) {
-            const steps = Math.abs(diff);
-            for (let s = 0; s < steps; s++) {
-              tgt.dispatchEvent(new KeyboardEvent("keydown", {
-                key: isInc ? ">" : "<",
-                code: isInc ? "Period" : "Comma",
-                keyCode: isInc ? 190 : 188,
-                which: isInc ? 190 : 188,
-                ctrlKey: true,
-                shiftKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-              }));
-              tgt.dispatchEvent(new KeyboardEvent("keyup", {
-                key: isInc ? ">" : "<",
-                code: isInc ? "Period" : "Comma",
-                keyCode: isInc ? 190 : 188,
-                which: isInc ? 190 : 188,
-                ctrlKey: true,
-                shiftKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-              }));
-            }
-          }
-        }
-      } catch {}
-
+      this.currentFontSize = tgtPt;
       this.focusEditor();
       return tgtPt;
     },
 
+    /**
+     * Kalibrasi dokumen ke standar resmi skripsi: 12 pt.
+     * Sangat berguna untuk memulihkan dokumen yang sebelumnya terketik 19 pt / ukuran salah.
+     */
+    async calibrateTo12(target = null, iframe = null) {
+      const actual = this.getActualFontSize();
+      this.currentFontSize = actual;
+      await this.changeFontSize(12, target, iframe);
+      this.currentFontSize = 12;
+      this.setBold(false, target, iframe);
+      this.applyAlignment("justify", target, iframe);
+      return 12;
+    },
+
     stepFontSize(direction = "inc", target = null, iframe = null) {
-      const tgt = target || this.getEditorTarget();
       const isInc = direction === "inc";
-      const btnSelector = isInc
-        ? "#fontSizeIncrement, [aria-label*='Besarkan ukuran font'], [aria-label*='Increase font size'], .docs-font-size-inc-button"
-        : "#fontSizeDecrement, [aria-label*='Kecilkan ukuran font'], [aria-label*='Decrease font size'], .docs-font-size-dec-button";
-      const btn = document.querySelector(btnSelector);
-      if (btn && typeof btn.click === "function") {
-        btn.click();
+      const btnId = isInc ? "fontSizeIncrement" : "fontSizeDecrement";
+      const btn = document.getElementById(btnId) ||
+                  document.querySelector(isInc
+                    ? "[aria-label*='Besarkan ukuran font'], [aria-label*='Increase font size']"
+                    : "[aria-label*='Kecilkan ukuran font'], [aria-label*='Decrease font size']");
+      if (btn && this.clickElement(btn)) {
+        if (this.currentFontSize) {
+          this.currentFontSize += (isInc ? 1 : -1);
+        }
         return;
       }
-      if (tgt) {
-        tgt.dispatchEvent(new KeyboardEvent("keydown", {
-          key: isInc ? ">" : "<",
-          code: isInc ? "Period" : "Comma",
-          keyCode: isInc ? 190 : 188,
-          which: isInc ? 190 : 188,
-          ctrlKey: true,
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-        tgt.dispatchEvent(new KeyboardEvent("keyup", {
-          key: isInc ? ">" : "<",
-          code: isInc ? "Period" : "Comma",
-          keyCode: isInc ? 190 : 188,
-          which: isInc ? 190 : 188,
-          ctrlKey: true,
-          shiftKey: true,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
+      this.sendFontStepShortcut(direction, target, iframe);
+      if (this.currentFontSize) {
+        this.currentFontSize += (isInc ? 1 : -1);
       }
     },
 
@@ -355,7 +471,7 @@
      * Alias backward-compatible setFontSize
      */
     setFontSize(sizePt, target = null, iframe = null) {
-      return this.changeFontSize(sizePt, null, target, iframe);
+      return this.changeFontSize(sizePt, target, iframe);
     },
 
     /**
@@ -365,6 +481,10 @@
      * - Justify: Ctrl+Shift+J (Paragraf Isi Rata Kanan-Kiri)
      */
     applyAlignment(align = "justify", target = null, iframe = null) {
+      if (this.currentAlign === align) {
+        return true;
+      }
+
       const tgt = target || this.getEditorTarget();
       const ifr = iframe || this.getEditorIframe();
 
@@ -397,14 +517,14 @@
           btn = document.querySelector(sel);
           if (btn) break;
         }
-        if (btn && typeof btn.click === "function") {
+        if (btn) {
           const isChecked =
             btn.getAttribute("aria-pressed") === "true" ||
             btn.getAttribute("aria-checked") === "true" ||
             btn.classList.contains("goog-toolbar-button-checked") ||
             btn.classList.contains("docs-material-button-checked");
           if (!isChecked) {
-            btn.click();
+            this.clickElement(btn);
           }
         }
       } catch {}
@@ -442,6 +562,7 @@
         try { ifr.contentDocument.execCommand(config.cmd, false, null); } catch {}
       }
 
+      this.currentAlign = align;
       return true;
     },
 
@@ -981,10 +1102,8 @@
         return true;
       }
 
-      // Standarisasi awal naskah: Bawa ukuran font ke 12pt, unbold, dan Rata Kanan-Kiri (Justify)
-      this.changeFontSize(12, null, target, iframe);
-      this.setBold(false, target, iframe);
-      this.applyAlignment("justify", target, iframe);
+      // Standarisasi awal naskah: Kalibrasi ke 12pt, unbold, dan Rata Kanan-Kiri (Justify)
+      await this.calibrateTo12(target, iframe);
 
       let inTocBlock = false;
 
@@ -1027,7 +1146,7 @@
           // - Sub-judul (1.1): 12 pt, BOLD, Left
           // - Sub-sub-judul (1.1.1): 12 pt, BOLD, Left
           // ========================================================
-          this.changeFontSize(hInfo.fontSize, null, target, iframe);
+          await this.changeFontSize(hInfo.fontSize, target, iframe);
           this.setBold(true, target, iframe);
           this.applyAlignment(hInfo.align || "center", target, iframe);
 
@@ -1038,7 +1157,7 @@
           this.insertNewline(target, iframe);
 
           // Kembalikan ke standar teks isi (12 pt, unbold, Justified)
-          this.changeFontSize(12, null, target, iframe);
+          await this.changeFontSize(12, target, iframe);
           this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
         } else if (isTocLine) {
@@ -1049,11 +1168,11 @@
           // ========================================================
           const isTocHeader = /^DAFTAR\s+ISI/i.test(block);
           if (isTocHeader) {
-            this.changeFontSize(14, null, target, iframe);
+            await this.changeFontSize(14, target, iframe);
             this.setBold(true, target, iframe);
             this.applyAlignment("center", target, iframe);
           } else {
-            this.changeFontSize(12, null, target, iframe);
+            await this.changeFontSize(12, target, iframe);
             this.setBold(false, target, iframe);
             this.applyAlignment("left", target, iframe);
           }
@@ -1064,7 +1183,7 @@
           this.insertNewline(target, iframe);
 
           // Kembalikan ke standar teks isi jika selesai baris TOC
-          this.changeFontSize(12, null, target, iframe);
+          await this.changeFontSize(12, target, iframe);
           this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
         } else {
@@ -1075,7 +1194,7 @@
           // - Format alinea: RATA KANAN-KIRI (Justify)
           // - Indentasi: WAJIB 1x TAB (~1.27 cm) di awal kalimat pertama
           // ========================================================
-          this.changeFontSize(12, null, target, iframe);
+          await this.changeFontSize(12, target, iframe);
           this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
 

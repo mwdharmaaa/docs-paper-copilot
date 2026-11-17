@@ -267,11 +267,15 @@
   }
 
   if (relearnBtn) {
-    relearnBtn.onclick = (e) => {
+    relearnBtn.onclick = async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      statusEl.textContent = "Menyelaraskan format dokumen ke standar 12pt...";
+      if (window.AutoTyper && typeof window.AutoTyper.calibrateTo12 === "function") {
+        await window.AutoTyper.calibrateTo12();
+      }
       updateLearnedPageProfile(true);
-      statusEl.textContent = "Format halaman berhasil dipelajari ulang.";
+      statusEl.textContent = "Format halaman berhasil diselaraskan ke standar baku (12 pt).";
     };
   }
 
@@ -347,6 +351,7 @@
           onComplete: () => {
             statusEl.textContent = "Selesai memasukkan satu draf ke dokumen Docs.";
             stopBtn.style.display = "none";
+            updateLearnedPageProfile(true);
           },
           onError: (err) => {
             statusEl.textContent = `Error: ${err}`;
