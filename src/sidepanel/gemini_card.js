@@ -75,9 +75,10 @@ export function renderGeminiCard(rawText, speed, onStatus, mode = "discuss") {
     <div class="refine-chips-row">
       <button type="button" class="refine-chip" data-refine="shorten">Persingkat</button>
       <button type="button" class="refine-chip" data-refine="elaborate">Perluas</button>
-      <button type="button" class="refine-chip" data-refine="formalize">Lebih Formal</button>
-      <button type="button" class="refine-chip" data-refine="bulletize">Jadikan Poin</button>
-      <button type="button" class="refine-chip" data-refine="puebi">Koreksi PUEBI</button>
+      <button type="button" class="refine-chip" data-refine="headings">Format Judul</button>
+      <button type="button" class="refine-chip" data-refine="daftar_isi">Daftar Isi</button>
+      <button type="button" class="refine-chip" data-refine="daftar_pustaka">Daftar Pustaka</button>
+      <button type="button" class="refine-chip" data-refine="puebi">PUEBI</button>
     </div>
   `;
 

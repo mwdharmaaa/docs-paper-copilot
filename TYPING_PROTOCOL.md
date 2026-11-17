@@ -1,9 +1,10 @@
-# Protokol Pengetikan GTyipe (Google Docs Paper Copilot)
+# Protokol Pengetikan & Format GTyipe (Google Docs Paper Copilot)
 
 > [!CAUTION]
 > **ATURAN MUTLAK / LOCKED PROTOCOL: JANGAN UBAH PROTOKOL INI PADA UPDATE APAPUN!**
 > Berdasarkan instruksi tegas pemilik proyek:
 > *"untuk selanjutnya jangan ubah protokolnya kalo update apapun, tapi ganti aja deh protokolnya jadi langsung selesai satu draf, biar sekali selesai langsung selesai semua"*
+> *"dan tetepin juga protokol deffault kalau bikin paragraph baru tu harus ditab sekali pada awal kalimatnya. pokoknya rencana aku tu ngejadiin gtype ini bukan cuma ngetik aja, tapi ngerti format dan lain lain"*
 
 ---
 
@@ -18,26 +19,45 @@
 
 ---
 
-## 2. Riwayat Evolusi Protokol Pengetikan
-1. **Fase 1: Animasi Ketik Huruf per Huruf (Deprecated / Ditinggalkan)**:
-   * Menggunakan jeda 6ms–20ms per huruf.
-   * Masalah: Sangat lambat untuk dokumen akademik/skripsi panjang (3.000+ kata) dan pernah mengalami bug hanya menekan enter-enter kosong jika event keypress terganggu.
-2. **Fase 2: Pengetikan per Paragraf (Commit `51838ff` - Deprecated)**:
-   * Mengetik blok per alinea dengan jeda antar-paragraf ~240ms–350ms.
-3. **Fase 3: Langsung Selesai Satu Draf (Commit Terkini - RESMI & DIKUNCI)**:
-   * Seluruh draf selesai seketika dalam satu kali eksekusi, efisien, mulus, dan bebas lag.
+## 2. Protokol Indentasi Paragraf Baru (Wajib 1x Tab)
+* **Aturan Mutlak**: Setiap kali memulai atau membuat paragraf baru (alinea teks dokumen), **WAJIB di-TAB satu kali (`\t`) pada awal kalimat pertama**.
+* **Pengecualian**: Baris Judul (Judul 1, Judul 2, Judul 3) dan Daftar Poin (`- ` atau `1. `) tidak diberikan Tab.
+* **Penegakan Otomatis di Mesin**: `auto_typer.js` secara otomatis menyisipkan 1x Tab jika paragraf belum memiliki indentasi tab.
 
 ---
 
-## 3. Komponen yang Terikat pada Protokol Ini
-* [`src/content/auto_typer.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/auto_typer.js):
-  * `typeDraft(rawText, options)` sebagai mesin utama penulisan instan.
-  * `instantInsert`, `typeParagraphs`, dan `typeStream` default ke 0ms delay.
-* [`src/content/in_page_agent.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/in_page_agent.js):
-  * `startTypingToDocs()` langsung mengeksekusi `AutoTyper.typeDraft()`.
-* [`src/content/docs_bridge.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/docs_bridge.js):
-  * Handler `AUTO_TYPE_REVISION` langsung mengeksekusi `AutoTyper.typeDraft()`.
-* [`src/sidepanel/gemini_card.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/sidepanel/gemini_card.js):
-  * Tombol *"Ketik Otomatis ke Docs"* mengeksekusi dengan `speed = 0`.
-* [`src/sidepanel/sidepanel.html`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/sidepanel/sidepanel.html) & [`src/sidepanel/sidepanel.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/sidepanel/sidepanel.js):
-  * Opsi kecepatan ngetik default ke *"Langsung Selesai Satu Draf (Default)"* (`value="0"`).
+## 3. Protokol Format Hierarki Judul (Headings) Google Docs
+* **Pintasan Keyboard Google Docs**:
+  * **Judul 1 (Heading 1)**: `Ctrl+Alt+1` (Digunakan untuk Judul Dokumen Utama, BAB I, BAB II, DAFTAR ISI, DAFTAR PUSTAKA).
+  * **Judul 2 (Heading 2)**: `Ctrl+Alt+2` (Digunakan untuk Sub-bab, contoh: 1.1 Latar Belakang).
+  * **Judul 3 (Heading 3)**: `Ctrl+Alt+3` (Digunakan untuk Sub-subbab, contoh: 1.1.1 Identifikasi Isu).
+  * **Judul 4 (Heading 4)**: `Ctrl+Alt+4` (Digunakan untuk poin abjad: a. Faktor Lingkungan).
+  * **Teks Normal (Normal Text)**: `Ctrl+Alt+0` (Otomatis dikembalikan setelah baris judul selesai).
+* **Dukungan Tag**: Mendukung penanda eksplisit `[JUDUL_1]`, `[JUDUL_2]`, `[JUDUL_3]`, maupun deteksi pola otomatis BAB Romawi dan penomoran desimal akademik.
+
+---
+
+## 4. Penonaktifan Permanen Pop-up Ejaan Google Docs
+* **Target Elemen**: `.docsSpellWizCheckupSurface`, `[class*="docsSpellWiz"]`, `[class*="SpellWiz"]`, dan dialog "Ejaan dan tata bahasa" (tombol Abaikan / Terima).
+* **Metode Pemblokiran**:
+  1. **CSS Hard-Suppression**: Menyembunyikan total melalui `display: none !important; opacity: 0 !important; pointer-events: none !important; position: fixed !important; top: -99999px !important;`.
+  2. **DOM MutationObserver Removal**: Observer aktif yang langsung menghapus node popup dari DOM begitu elemen tersebut terbentuk di halaman dokumen atau iframe.
+
+---
+
+## 5. Arsitektur Akademik Lengkap GTyipe
+1. **Daftar Isi (Table of Contents)**: Penyusunan terstruktur dengan titik-titik pemimpin (*dot leaders* `..........`) sejajar ke nomor halaman di sisi kanan, membedakan halaman Romawi kecil (`i, ii, iii`) dan Arab (`1, 2, 3`).
+2. **Penomoran Halaman (Page Numbering)**:
+   - Bagian Awal: Romawi kecil di tengah bawah.
+   - Bagian Isi: Angka Arab, posisi tengah bawah untuk halaman pertama setiap Bab baru, dan kanan atas untuk halaman lanjutan.
+3. **Daftar Pustaka & Sitasi**: Format baku APA 7th Edition (alfabetis A-Z, tanpa nomor urut, format *hanging indent* dengan baris kedua menjorok 1x Tab).
+4. **Tabel & Gambar**: Judul Tabel diletakkan di atas tabel, Judul Gambar diletakkan di bawah gambar bersumber data.
+
+---
+
+## 6. Komponen yang Terikat pada Protokol Ini
+* [`src/content/auto_typer.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/auto_typer.js): Mesin eksekusi penulisan instan, indentasi 1x Tab, dan pemformatan Judul 1/2/3.
+* [`src/content/docs_observer.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/docs_observer.js): Penekan permanen pop-up ejaan Google Docs.
+* [`src/content/in_page_agent.css`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/content/in_page_agent.css): CSS suppression untuk pop-up ejaan.
+* [`src/core/prompt_templates.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/core/prompt_templates.js): Direktif pemikiran arsitek dokumen akademik senior.
+* [`src/sidepanel/gemini_card.js`](file:///home/user/space/project/tools/ext/docs-paper-copilot/src/sidepanel/gemini_card.js): Tombol aksi format cepat (*Format Judul*, *Daftar Isi*, *Daftar Pustaka*).

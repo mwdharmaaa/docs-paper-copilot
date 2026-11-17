@@ -527,3 +527,41 @@
   border-left: 2px solid #555555;
   padding-left: 8px;
 }
+
+/* ==========================================================================
+   PERMANENT SUPPRESSION: Google Docs Spell & Grammar Checkup Surface / Popups
+   Menonaktifkan dan menyembunyikan total popup saran "Ejaan dan tata bahasa",
+   tombol Abaikan / Terima, dan seluruh turunan docsSpellWizCheckupSurface.
+   ========================================================================== */
+.docsSpellWizCheckupSurface,
+.docsSpellWizCheckupSurfaceHeader,
+.docsSpellWizCheckupSurfaceOriginalWord,
+.docsSpellWizCheckupSurfaceSuggestionButtonContainer,
+.docsSpellWizCheckupSurfaceButtonContainer,
+div[class*="docsSpellWiz"],
+div[class*="SpellWiz"],
+div[id*="docsSpellWiz"],
+.docs-spell-bubble,
+.docs-spellcheck-bubble,
+.kix-spell-bubble,
+.docs-bubble:has([class*="SpellWiz"]),
+.docs-bubble:has([class*="spell"]),
+div[aria-label*="Ejaan dan tata bahasa"],
+div[aria-label*="Spelling and grammar"],
+div[aria-label*="Saran ejaan"],
+div[aria-label*="Spelling suggestion"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(100%) !important;
+  position: fixed !important;
+  top: -99999px !important;
+  left: -99999px !important;
+  z-index: -999999 !important;
+}

@@ -1,11 +1,14 @@
 /**
  * Docs Paper Copilot - Auto Typer Engine
  * Protokol Resmi: LANGSUNG SELESAI SATU DRAF (Instant Whole Draft)
+ * Indentasi Baku: 1x TAB DI AWAL SETIAP PARAGRAF BARU
+ * Format Judul: DUKUNGAN HIERARKI JUDUL 1, JUDUL 2, JUDUL 3 (Google Docs Headings)
  * 
  * ATURAN MUTLAK / PROTOKOL PERMANEN:
  * Berdasarkan instruksi pengguna: PROTOKOL INI TIDAK BOLEH DIUBAH PADA UPDATE APAPUN.
- * Jangan pernah mengubah kembali ke mode animasi ketik lambat per-karakter (char-by-char delay).
+ * Jangan pernah mengubah kembali ke mode animasi ketik lambat per-karakter.
  * Sekali aksi pengetikan dipicu, seluruh draf dokumen diselesaikan dan dimasukkan secara langsung.
+ * Paragraf baru wajib diawali dengan 1x Tab (indentasi alinea).
  * Strictly zero emojis and pure monochrome workflow.
  */
 
@@ -69,39 +72,40 @@
 
       let s = text;
 
-      // 0. Remove special draft delimiters if present
+      // 0. Hapus pembatas draf internal jika ada
       s = s.replace(/<<<DRAF_DOKUMEN>>>/g, "");
       s = s.replace(/<<<AKHIR_DRAF_DOKUMEN>>>/g, "");
 
-      // 1. Remove markdown code block markers
+      // 1. Standarisasi header Markdown ke tag format hierarki judul GTyipe
+      s = s.replace(/^[ \t]*#\s+(.*)$/gm, "[JUDUL_1] $1");
+      s = s.replace(/^[ \t]*##\s+(.*)$/gm, "[JUDUL_2] $1");
+      s = s.replace(/^[ \t]*###\s+(.*)$/gm, "[JUDUL_3] $1");
+      s = s.replace(/^[ \t]*####\s+(.*)$/gm, "[JUDUL_4] $1");
+
+      // 2. Hapus markdown code block markers
       s = s.replace(/^```[a-zA-Z]*\r?\n/gm, "");
       s = s.replace(/\r?\n```$/gm, "");
       s = s.replace(/```/g, "");
 
-      // 2. Remove horizontal rules (---, ***, ___)
+      // 3. Hapus garis horizontal (---, ***, ___)
       s = s.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, "");
 
-      // 3. Remove markdown headers (# Title, ## Subtitle, etc.)
-      s = s.replace(/^[ \t]*#{1,6}\s*/gm, "");
-
-      // 4. Standardize bullet points: replace '* item' with '- item'
+      // 4. Standarisasi daftar poin
       s = s.replace(/^[ \t]*\*[ \t]+/gm, "- ");
 
-      // 5. Clean parenthesized asterisk terms: (*Betta splendens*) -> (Betta splendens)
+      // 5. Bersihkan asterisk dalam kurung ilmiah: (*Betta splendens*) -> (Betta splendens)
       s = s.replace(/\(\*+([^*]+)\*+\)/g, "($1)");
 
-      // 6. Strip bold/italic asterisks: ***text*** -> text, **text** -> text, *text* -> text
+      // 6. Hapus asterisk penanda tebal/miring dari teks Docs murni
       s = s.replace(/\*{3}([^*]+)\*{3}/g, "$1");
       s = s.replace(/\*{2}([^*]+)\*{2}/g, "$1");
       s = s.replace(/\*([^*\r\n]+)\*/g, "$1");
-
-      // 7. Strip any remaining stray asterisks
       s = s.replace(/\*/g, "");
 
-      // 8. Strip markdown backticks
+      // 7. Hapus backtick
       s = s.replace(/`/g, "");
 
-      // 9. Normalize multiple consecutive blank lines to max 2 newlines
+      // 8. Normalisasi jarak baris berlebih
       s = s.replace(/(\r?\n){3,}/g, "\n\n");
 
       return s.trim();
@@ -138,6 +142,56 @@
         }
       } catch (err) {
         console.warn("[AutoTyper] ensureNormalFont error:", err);
+      }
+    },
+
+    /**
+     * Terapkan Format Judul Google Docs (Heading 1..6 / Normal Text)
+     * Menggunakan pintasan keyboard resmi Google Docs:
+     * - Ctrl+Alt+1: Judul 1 (Heading 1)
+     * - Ctrl+Alt+2: Judul 2 (Heading 2)
+     * - Ctrl+Alt+3: Judul 3 (Heading 3)
+     * - Ctrl+Alt+4: Judul 4 (Heading 4)
+     * - Ctrl+Alt+0: Teks Normal (Normal Text)
+     */
+    applyHeading(level = 0, target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      if (!tgt) return false;
+
+      const lvl = Math.max(0, Math.min(6, parseInt(level, 10) || 0));
+      const keyStr = String(lvl);
+      const charCode = 48 + lvl; // 0 -> 48, 1 -> 49, dst.
+      const codeStr = lvl === 0 ? "Digit0" : `Digit${lvl}`;
+
+      try {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
+          key: keyStr,
+          code: codeStr,
+          keyCode: charCode,
+          which: charCode,
+          ctrlKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        tgt.dispatchEvent(new KeyboardEvent("keyup", {
+          key: keyStr,
+          code: codeStr,
+          keyCode: charCode,
+          which: charCode,
+          ctrlKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        return true;
+      } catch (err) {
+        console.warn("[AutoTyper] applyHeading failed:", err);
+        return false;
       }
     },
 
@@ -205,9 +259,81 @@
       }
     },
 
+    /**
+     * Memasukkan Karakter Tab (Indentasi Paragraf Baku)
+     */
+    insertTab(target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+      if (!tgt) return false;
+
+      try {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Tab",
+          code: "Tab",
+          keyCode: 9,
+          which: 9,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        tgt.dispatchEvent(new KeyboardEvent("keypress", {
+          key: "Tab",
+          code: "Tab",
+          charCode: 9,
+          keyCode: 9,
+          which: 9,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        tgt.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: "\t",
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        if (ifr && ifr.contentDocument) {
+          try {
+            ifr.contentDocument.execCommand("insertText", false, "\t");
+          } catch {}
+        }
+
+        tgt.dispatchEvent(new InputEvent("input", {
+          inputType: "insertText",
+          data: "\t",
+          bubbles: true,
+          cancelable: false,
+          composed: true
+        }));
+
+        tgt.dispatchEvent(new KeyboardEvent("keyup", {
+          key: "Tab",
+          code: "Tab",
+          keyCode: 9,
+          which: 9,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        return true;
+      } catch (err) {
+        console.warn("[AutoTyper] insertTab failed:", err);
+        return false;
+      }
+    },
+
     insertChar(ch, target = null, iframe = null) {
       if (ch === "\n" || ch === "\r") {
         return this.insertNewline(target, iframe);
+      }
+      if (ch === "\t") {
+        return this.insertTab(target, iframe);
       }
 
       const tgt = target || this.getEditorTarget();
@@ -282,15 +408,6 @@
       }
     },
 
-    insertChunk(chunk, target = null, iframe = null) {
-      if (!chunk) return false;
-      const chars = Array.from(chunk);
-      for (const ch of chars) {
-        this.insertChar(ch, target, iframe);
-      }
-      return true;
-    },
-
     splitIntoParagraphs(text) {
       if (!text || typeof text !== "string") return [];
       if (/\r?\n\s*\r?\n/.test(text)) {
@@ -300,8 +417,54 @@
     },
 
     /**
+     * Menganalisis apakah baris teks merupakan Judul (Heading) atau Paragraf biasa.
+     */
+    parseLineHeading(rawLine) {
+      if (!rawLine || typeof rawLine !== "string") {
+        return { level: 0, text: "", isHeading: false };
+      }
+
+      const trimmed = rawLine.trim();
+
+      // 1. Tag Eksplisit
+      let m = trimmed.match(/^\[(?:JUDUL_1|H1)\]\s*(.*)$/i);
+      if (m) return { level: 1, text: m[1].trim(), isHeading: true };
+
+      m = trimmed.match(/^\[(?:JUDUL_2|H2)\]\s*(.*)$/i);
+      if (m) return { level: 2, text: m[1].trim(), isHeading: true };
+
+      m = trimmed.match(/^\[(?:JUDUL_3|H3)\]\s*(.*)$/i);
+      if (m) return { level: 3, text: m[1].trim(), isHeading: true };
+
+      m = trimmed.match(/^\[(?:JUDUL_4|H4)\]\s*(.*)$/i);
+      if (m) return { level: 4, text: m[1].trim(), isHeading: true };
+
+      m = trimmed.match(/^\[(?:JUDUL_DOKUMEN|TITLE)\]\s*(.*)$/i);
+      if (m) return { level: 1, text: m[1].trim(), isHeading: true, isDocTitle: true };
+
+      m = trimmed.match(/^\[SUBJUDUL\]\s*(.*)$/i);
+      if (m) return { level: 2, text: m[1].trim(), isHeading: true };
+
+      // 2. Deteksi Konvensi Akademik Otomatis
+      if (/^BAB\s+[IVXLCDM]+(\s+.*)?$/i.test(trimmed)) {
+        return { level: 1, text: trimmed, isHeading: true };
+      }
+      if (/^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|KATA\s+PENGANTAR|ABSTRAK|RINGKASAN|DAFTAR\s+TABEL|DAFTAR\s+GAMBAR)$/i.test(trimmed)) {
+        return { level: 1, text: trimmed, isHeading: true };
+      }
+      if (/^\d+\.\d+\s+[A-Z]/.test(trimmed)) {
+        return { level: 2, text: trimmed, isHeading: true };
+      }
+      if (/^\d+\.\d+\.\d+\s+[A-Z]/.test(trimmed)) {
+        return { level: 3, text: trimmed, isHeading: true };
+      }
+
+      return { level: 0, text: rawLine, isHeading: false };
+    },
+
+    /**
      * PROTOKOL UTAMA: Langsung Selesai Satu Draf (Instant Whole Draft)
-     * Memasukkan draf lengkap ke Google Docs seketika tanpa jeda animasi lambat.
+     * Mengintegrasikan format Judul 1/2/3 dan Indentasi Tab Paragraf Baru.
      */
     async typeDraft(rawText, options = {}) {
       const {
@@ -319,7 +482,6 @@
       this.isTyping = true;
       this.abortRequested = false;
 
-      // Blur control eksternal agar fokus editor Docs tidak terganggu
       if (document.activeElement && typeof document.activeElement.blur === "function") {
         document.activeElement.blur();
       }
@@ -355,30 +517,64 @@
           return false;
         }
 
-        this.ensureNormalFont();
-
         const p = paragraphs[i];
         const lines = p.split(/\r?\n/);
 
         for (let l = 0; l < lines.length; l++) {
           if (this.abortRequested) break;
 
-          const line = lines[l].trim();
-          if (line) {
-            const chars = Array.from(line);
+          const rawLine = lines[l].trim();
+          if (!rawLine) continue;
+
+          const hInfo = this.parseLineHeading(rawLine);
+
+          if (hInfo.isHeading && hInfo.level > 0) {
+            // ========================================================
+            // EKSEKUSI FORMAT JUDUL (Judul 1, Judul 2, Judul 3, dst.)
+            // ========================================================
+            this.applyHeading(hInfo.level, target, iframe);
+
+            const chars = Array.from(hInfo.text);
+            for (let c = 0; c < chars.length; c++) {
+              if (this.abortRequested) break;
+              this.insertChar(chars[c], target, iframe);
+            }
+
+            if (l < lines.length - 1 || i < total - 1) {
+              this.insertNewline(target, iframe);
+              // Kembalikan ke Normal Text untuk baris selanjutnya
+              this.applyHeading(0, target, iframe);
+              this.ensureNormalFont();
+            }
+          } else {
+            // ========================================================
+            // EKSEKUSI PARAGRAF BIASA / ISI DOKUMEN
+            // PROTOKOL BAKU: Wajib di-Tab 1x pada awal kalimat paragraf baru!
+            // ========================================================
+            this.applyHeading(0, target, iframe);
+            this.ensureNormalFont();
+
+            const isList = /^[-*•]\s+/.test(hInfo.text) || /^\d+\.\s+/.test(hInfo.text);
+            let textToType = hInfo.text;
+
+            // Indentasi 1x Tab jika baris pertama alinea dan bukan daftar poin
+            if (l === 0 && !isList && !textToType.startsWith("\t") && textToType.length > 0) {
+              textToType = "\t" + textToType;
+            }
+
+            const chars = Array.from(textToType);
             for (let c = 0; c < chars.length; c++) {
               if (this.abortRequested) break;
               this.insertChar(chars[c], target, iframe);
 
-              // Micro-yield periodik setiap 120 karakter agar event queue Docs & render thread tetap bernapas
               if (c > 0 && c % 120 === 0) {
                 await new Promise((res) => setTimeout(res, 0));
               }
             }
-          }
 
-          if (l < lines.length - 1) {
-            this.insertNewline(target, iframe);
+            if (l < lines.length - 1) {
+              this.insertNewline(target, iframe);
+            }
           }
         }
 
@@ -405,120 +601,8 @@
       return true;
     },
 
-    /**
-     * Backward-compatible typeParagraphs (Default ke Protokol Langsung Selesai Satu Draf)
-     */
     async typeParagraphs(rawText, options = {}) {
-      const {
-        charDelayMs = 0,
-        paragraphDelayMs = 0,
-        ...rest
-      } = options;
-
-      // Jika delay 0 (Protokol Resmi Terkunci), jalankan langsung typeDraft
-      if ((!charDelayMs || charDelayMs <= 0) && (!paragraphDelayMs || paragraphDelayMs <= 0)) {
-        return this.typeDraft(rawText, { ...rest, ...options });
-      }
-
-      // Fallback jika secara eksplisit pengguna/sistem menyertakan jeda animasi
-      if (!rawText || rawText.length === 0) {
-        if (options.onComplete) options.onComplete();
-        return true;
-      }
-
-      this.isTyping = true;
-      this.abortRequested = false;
-
-      if (document.activeElement && typeof document.activeElement.blur === "function") {
-        document.activeElement.blur();
-      }
-
-      this.focusEditor();
-      this.ensureNormalFont();
-      await new Promise((res) => setTimeout(res, 40));
-      this.focusEditor();
-
-      const target = this.getEditorTarget();
-      const iframe = this.getEditorIframe();
-      if (!target) {
-        this.isTyping = false;
-        if (options.onError) options.onError("Target editor Google Docs tidak ditemukan.");
-        return false;
-      }
-
-      const cleanText = this.cleanMarkdownForDocs(rawText);
-      const paragraphs = this.splitIntoParagraphs(cleanText);
-      const total = paragraphs.length;
-
-      if (total === 0) {
-        this.isTyping = false;
-        if (options.onComplete) options.onComplete();
-        return true;
-      }
-
-      for (let i = 0; i < total; i++) {
-        if (this.abortRequested) {
-          this.isTyping = false;
-          this.abortRequested = false;
-          if (options.onCancel) options.onCancel();
-          return false;
-        }
-
-        this.ensureNormalFont();
-
-        const p = paragraphs[i];
-        const lines = p.split(/\r?\n/);
-
-        for (let l = 0; l < lines.length; l++) {
-          if (this.abortRequested) break;
-
-          const line = lines[l].trim();
-          if (line) {
-            const chars = Array.from(line);
-            for (let c = 0; c < chars.length; c++) {
-              if (this.abortRequested) break;
-              this.insertChar(chars[c], target, iframe);
-
-              if (charDelayMs > 0) {
-                await new Promise((res) => setTimeout(res, charDelayMs));
-              } else if (c % 120 === 0 && c > 0) {
-                await new Promise((res) => setTimeout(res, 0));
-              }
-            }
-          }
-
-          if (l < lines.length - 1) {
-            this.insertNewline(target, iframe);
-            if (charDelayMs > 0) {
-              await new Promise((res) => setTimeout(res, Math.max(20, charDelayMs * 2)));
-            }
-          }
-        }
-
-        const percent = Math.round(((i + 1) / total) * 100);
-        if (options.onProgress) {
-          options.onProgress({
-            current: i + 1,
-            total,
-            percent,
-            paragraphIndex: i + 1,
-            totalParagraphs: total
-          });
-        }
-
-        if (i < total - 1) {
-          this.insertNewline(target, iframe);
-          this.insertNewline(target, iframe);
-
-          if (paragraphDelayMs > 0) {
-            await new Promise((res) => setTimeout(res, paragraphDelayMs));
-          }
-        }
-      }
-
-      this.isTyping = false;
-      if (options.onComplete) options.onComplete();
-      return true;
+      return this.typeDraft(rawText, options);
     },
 
     instantInsert(rawText, options = {}) {
@@ -526,16 +610,7 @@
     },
 
     async typeStream(text, options = {}) {
-      const { speedMs, paragraphDelayMs, charDelayMs, ...rest } = options;
-      // Protokol resmi: default langsung selesai satu draf tanpa penundaan
-      if (!speedMs && !paragraphDelayMs && !charDelayMs) {
-        return this.typeDraft(text, rest);
-      }
-      return this.typeParagraphs(text, {
-        charDelayMs: charDelayMs || (speedMs ? parseInt(speedMs, 10) : 0),
-        paragraphDelayMs: paragraphDelayMs || 0,
-        ...rest
-      });
+      return this.typeDraft(text, options);
     },
 
     stop() {
