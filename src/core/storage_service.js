@@ -9,7 +9,8 @@ const DEFAULT_SETTINGS = {
   model: "gemini-3.5-flash",
   academicStyle: "formal-id",
   temperature: 0.35,
-  autoCopyOnGenerate: true
+  autoCopyOnGenerate: true,
+  speed: "0"
 };
 
 function normalizeModel(model) {

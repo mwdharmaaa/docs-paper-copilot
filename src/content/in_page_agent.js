@@ -277,10 +277,11 @@
     return window.getSelection()?.toString().trim() || "";
   }
 
-  // Typewriter Execution Bridge
+  // Protokol Pengetikan Resmi: Langsung Selesai Satu Draf (Instant Whole Draft)
+  // PERINGATAN: DILARANG MENGUBAH PROTOKOL INI PADA UPDATE APAPUN DI MASA DEPAN.
   function startTypingToDocs(textToType) {
     if (!textToType || !textToType.trim()) {
-      statusEl.textContent = "Tidak ada teks yang dapat diketik.";
+      statusEl.textContent = "Tidak ada draf yang dapat dimasukkan.";
       return;
     }
 
@@ -289,19 +290,16 @@
       ? window.AutoTyper.cleanMarkdownForDocs(textToType)
       : textToType;
 
-    stopBtn.style.display = "inline-block";
-    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Menyiapkan pengetikan ke dokumen...';
+    statusEl.innerHTML = '<span class="gemini-pulse-dot"></span> Memasukkan draf lengkap ke dokumen...';
 
     if (window.AutoTyper) {
       setTimeout(() => {
-        window.AutoTyper.typeParagraphs(cleanContent, {
-          charDelayMs: 6,
-          paragraphDelayMs: 220,
+        window.AutoTyper.typeDraft(cleanContent, {
           onProgress: (p) => {
-            statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Mengetik paragraf ${p.paragraphIndex} dari ${p.totalParagraphs} (${p.percent}%)...`;
+            statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Memasukkan draf ke dokumen (${p.percent}%)...`;
           },
           onComplete: () => {
-            statusEl.textContent = "Selesai mengetik ke halaman Docs.";
+            statusEl.textContent = "Selesai memasukkan satu draf ke dokumen Docs.";
             stopBtn.style.display = "none";
           },
           onError: (err) => {
@@ -313,7 +311,7 @@
             stopBtn.style.display = "none";
           }
         });
-      }, 40);
+      }, 25);
     } else {
       statusEl.textContent = "Error: AutoTyper engine tidak tersedia.";
       stopBtn.style.display = "none";

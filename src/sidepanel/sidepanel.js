@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const settings = await StorageService.getSettings();
   document.getElementById("setting-apikey").value = settings.apiKey || "";
   document.getElementById("setting-model").value = settings.model || "gemini-3.5-flash";
-  document.getElementById("setting-speed").value = settings.speed || "20";
+  document.getElementById("setting-speed").value = settings.speed !== undefined ? String(settings.speed) : "0";
 
   openSettingsBtn.onclick = () => settingsDrawer.style.display = "flex";
   closeSettingsBtn.onclick = () => settingsDrawer.style.display = "none";
@@ -151,7 +151,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       conversationHistory.push({ role: "user", text: cleanPrompt });
       conversationHistory.push({ role: "model", text: responseText });
 
-      const speed = parseInt(document.getElementById("setting-speed").value, 10) || 20;
+      const rawSpeed = parseInt(document.getElementById("setting-speed").value, 10);
+      const speed = isNaN(rawSpeed) ? 0 : rawSpeed;
       const card = renderGeminiCard(responseText, speed, (status) => {
         footerStatus.textContent = status;
       }, currentMode);

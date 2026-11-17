@@ -5,7 +5,7 @@ AI assistant modeled after the official Google Workspace **Ask Gemini** & **Help
 ## Key Features
 
 - **Ask Gemini Conversational Side Panel**: Ask questions about your active document, draft new sections, summarize findings, or polish prose.
-- **Autonomous Auto-Typing to Docs**: Rather than just dumping text, Gemini types directly into your Google Docs editor canvas in real-time (*typewriter streaming*).
+- **Autonomous Typing (Protokol: Langsung Selesai Satu Draf)**: Secara resmi mengadopsi protokol *Instant Whole Draft* — draf dokumen dimasukkan dan selesai seketika ke Google Docs dalam sekali eksekusi tanpa jeda lambat per-karakter (lihat [TYPING_PROTOCOL.md](TYPING_PROTOCOL.md)).
 - **In-Page "Help Me Write" Pill (`Alt+G`)**: A floating Gemini sparkle pill on Google Docs that pops up an inline prompt bar to generate drafts at your cursor.
 - **Doc Context Awareness**: Automatically reads the document title and current user selection to tailor answers.
 - **Instant Refine Actions**: Refine any generated response with single-click actions: *Persingkat*, *Perluas*, *Lebih Formal*, *Jadikan Poin*, and *Koreksi PUEBI*.

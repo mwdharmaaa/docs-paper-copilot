@@ -115,20 +115,19 @@
     }
 
     if (request.action === "AUTO_TYPE_REVISION") {
-      const { text, speedMs } = request;
+      const { text } = request;
       if (!text) {
         sendResponse({ success: false, error: "Empty text payload" });
         return false;
       }
 
       if (window.AutoTyper) {
-        window.AutoTyper.typeStream(text, {
-          speedMs: speedMs || 0,
+        window.AutoTyper.typeDraft(text, {
           onComplete: () => {
-            showDocsNotification("Selesai memasukkan teks ke dokumen.");
+            showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
           },
           onError: (err) => {
-            showDocsNotification(err || "Gagal memasukkan ke dokumen.");
+            showDocsNotification(err || "Gagal memasukkan draf ke dokumen.");
           }
         });
         sendResponse({ success: true, started: true });

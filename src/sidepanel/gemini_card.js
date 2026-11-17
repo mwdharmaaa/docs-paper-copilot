@@ -85,10 +85,10 @@ export function renderGeminiCard(rawText, speed, onStatus, mode = "discuss") {
   const targetContent = hasDraft ? draftText : (discussionText || rawText);
 
   card.querySelector(".btn-auto-type").onclick = async () => {
-    onStatus("GTyipe sedang ngetik otomatis di dokumen Docs...");
+    onStatus("GTyipe sedang memasukkan draf ke dokumen Docs...");
     try {
-      await ActionHandlers.autoTypeToDocs(targetContent, speed);
-      onStatus("Selesai ngetik ke halaman.");
+      await ActionHandlers.autoTypeToDocs(targetContent, 0);
+      onStatus("Selesai memasukkan satu draf ke dokumen Docs.");
     } catch (err) {
       onStatus(`Error: ${err.message}`);
     }

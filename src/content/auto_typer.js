@@ -1,7 +1,11 @@
 /**
  * Docs Paper Copilot - Auto Typer Engine
- * Simulates elegant, reliable paragraph-by-paragraph and streaming automated typing
- * into Google Docs editor target without character dropping or text corruption.
+ * Protokol Resmi: LANGSUNG SELESAI SATU DRAF (Instant Whole Draft)
+ * 
+ * ATURAN MUTLAK / PROTOKOL PERMANEN:
+ * Berdasarkan instruksi pengguna: PROTOKOL INI TIDAK BOLEH DIUBAH PADA UPDATE APAPUN.
+ * Jangan pernah mengubah kembali ke mode animasi ketik lambat per-karakter (char-by-char delay).
+ * Sekali aksi pengetikan dipicu, seluruh draf dokumen diselesaikan dan dimasukkan secara langsung.
  * Strictly zero emojis and pure monochrome workflow.
  */
 
@@ -137,15 +141,13 @@
       }
     },
 
-    insertNewline() {
-      const iframe = this.getEditorIframe();
-      const target = this.getEditorTarget();
-      if (!target) return false;
-
-      this.focusEditor();
+    insertNewline(target = null, iframe = null) {
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+      if (!tgt) return false;
 
       try {
-        target.dispatchEvent(new KeyboardEvent("keydown", {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
           key: "Enter",
           code: "Enter",
           keyCode: 13,
@@ -155,7 +157,7 @@
           composed: true
         }));
 
-        target.dispatchEvent(new KeyboardEvent("keypress", {
+        tgt.dispatchEvent(new KeyboardEvent("keypress", {
           key: "Enter",
           code: "Enter",
           charCode: 13,
@@ -166,27 +168,27 @@
           composed: true
         }));
 
-        target.dispatchEvent(new InputEvent("beforeinput", {
+        tgt.dispatchEvent(new InputEvent("beforeinput", {
           inputType: "insertParagraph",
           bubbles: true,
           cancelable: true,
           composed: true
         }));
 
-        if (iframe && iframe.contentDocument) {
+        if (ifr && ifr.contentDocument) {
           try {
-            iframe.contentDocument.execCommand("insertParagraph", false);
+            ifr.contentDocument.execCommand("insertParagraph", false);
           } catch {}
         }
 
-        target.dispatchEvent(new InputEvent("input", {
+        tgt.dispatchEvent(new InputEvent("input", {
           inputType: "insertParagraph",
           bubbles: true,
           cancelable: false,
           composed: true
         }));
 
-        target.dispatchEvent(new KeyboardEvent("keyup", {
+        tgt.dispatchEvent(new KeyboardEvent("keyup", {
           key: "Enter",
           code: "Enter",
           keyCode: 13,
@@ -203,16 +205,14 @@
       }
     },
 
-    insertChar(ch) {
+    insertChar(ch, target = null, iframe = null) {
       if (ch === "\n" || ch === "\r") {
-        return this.insertNewline();
+        return this.insertNewline(target, iframe);
       }
 
-      const iframe = this.getEditorIframe();
-      const target = this.getEditorTarget();
-      if (!target) return false;
-
-      this.focusEditor();
+      const tgt = target || this.getEditorTarget();
+      const ifr = iframe || this.getEditorIframe();
+      if (!tgt) return false;
 
       try {
         const charCode = ch.charCodeAt(0);
@@ -222,7 +222,7 @@
         else if (ch >= "0" && ch <= "9") code = "Digit" + ch;
         else if (ch === " ") code = "Space";
 
-        target.dispatchEvent(new KeyboardEvent("keydown", {
+        tgt.dispatchEvent(new KeyboardEvent("keydown", {
           key: ch,
           code: code,
           keyCode: charCode,
@@ -232,7 +232,7 @@
           composed: true
         }));
 
-        target.dispatchEvent(new KeyboardEvent("keypress", {
+        tgt.dispatchEvent(new KeyboardEvent("keypress", {
           key: ch,
           code: code,
           charCode: charCode,
@@ -243,7 +243,7 @@
           composed: true
         }));
 
-        target.dispatchEvent(new InputEvent("beforeinput", {
+        tgt.dispatchEvent(new InputEvent("beforeinput", {
           inputType: "insertText",
           data: ch,
           bubbles: true,
@@ -251,13 +251,13 @@
           composed: true
         }));
 
-        if (iframe && iframe.contentDocument) {
+        if (ifr && ifr.contentDocument) {
           try {
-            iframe.contentDocument.execCommand("insertText", false, ch);
+            ifr.contentDocument.execCommand("insertText", false, ch);
           } catch {}
         }
 
-        target.dispatchEvent(new InputEvent("input", {
+        tgt.dispatchEvent(new InputEvent("input", {
           inputType: "insertText",
           data: ch,
           bubbles: true,
@@ -265,7 +265,7 @@
           composed: true
         }));
 
-        target.dispatchEvent(new KeyboardEvent("keyup", {
+        tgt.dispatchEvent(new KeyboardEvent("keyup", {
           key: ch,
           code: code,
           keyCode: charCode,
@@ -282,14 +282,11 @@
       }
     },
 
-    insertChunk(chunk) {
+    insertChunk(chunk, target = null, iframe = null) {
       if (!chunk) return false;
-      if (chunk.length === 1) {
-        return this.insertChar(chunk);
-      }
       const chars = Array.from(chunk);
       for (const ch of chars) {
-        this.insertChar(ch);
+        this.insertChar(ch, target, iframe);
       }
       return true;
     },
@@ -302,10 +299,12 @@
       return text.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
     },
 
-    async typeParagraphs(rawText, options = {}) {
+    /**
+     * PROTOKOL UTAMA: Langsung Selesai Satu Draf (Instant Whole Draft)
+     * Memasukkan draf lengkap ke Google Docs seketika tanpa jeda animasi lambat.
+     */
+    async typeDraft(rawText, options = {}) {
       const {
-        charDelayMs = 6,
-        paragraphDelayMs = 240,
         onProgress,
         onComplete,
         onCancel,
@@ -320,17 +319,18 @@
       this.isTyping = true;
       this.abortRequested = false;
 
-      // Blur any active input controls outside Docs
+      // Blur control eksternal agar fokus editor Docs tidak terganggu
       if (document.activeElement && typeof document.activeElement.blur === "function") {
         document.activeElement.blur();
       }
 
       this.focusEditor();
       this.ensureNormalFont();
-      await new Promise((res) => setTimeout(res, 50));
+      await new Promise((res) => setTimeout(res, 40));
       this.focusEditor();
 
       const target = this.getEditorTarget();
+      const iframe = this.getEditorIframe();
       if (!target) {
         this.isTyping = false;
         if (onError) onError("Target editor Google Docs tidak ditemukan.");
@@ -368,19 +368,17 @@
             const chars = Array.from(line);
             for (let c = 0; c < chars.length; c++) {
               if (this.abortRequested) break;
-              this.insertChar(chars[c]);
+              this.insertChar(chars[c], target, iframe);
 
-              if (charDelayMs > 0) {
-                await new Promise((res) => setTimeout(res, charDelayMs));
-              } else if (c % 25 === 0) {
+              // Micro-yield periodik setiap 120 karakter agar event queue Docs & render thread tetap bernapas
+              if (c > 0 && c % 120 === 0) {
                 await new Promise((res) => setTimeout(res, 0));
               }
             }
           }
 
           if (l < lines.length - 1) {
-            this.insertNewline();
-            await new Promise((res) => setTimeout(res, Math.max(25, charDelayMs * 3)));
+            this.insertNewline(target, iframe);
           }
         }
 
@@ -395,14 +393,10 @@
           });
         }
 
-        // Insert paragraph separation and pause with smooth cadence
+        // Pemisahan alinea draf
         if (i < total - 1) {
-          this.insertNewline();
-          this.insertNewline();
-
-          if (paragraphDelayMs > 0) {
-            await new Promise((res) => setTimeout(res, paragraphDelayMs));
-          }
+          this.insertNewline(target, iframe);
+          this.insertNewline(target, iframe);
         }
       }
 
@@ -411,26 +405,135 @@
       return true;
     },
 
+    /**
+     * Backward-compatible typeParagraphs (Default ke Protokol Langsung Selesai Satu Draf)
+     */
+    async typeParagraphs(rawText, options = {}) {
+      const {
+        charDelayMs = 0,
+        paragraphDelayMs = 0,
+        ...rest
+      } = options;
+
+      // Jika delay 0 (Protokol Resmi Terkunci), jalankan langsung typeDraft
+      if ((!charDelayMs || charDelayMs <= 0) && (!paragraphDelayMs || paragraphDelayMs <= 0)) {
+        return this.typeDraft(rawText, { ...rest, ...options });
+      }
+
+      // Fallback jika secara eksplisit pengguna/sistem menyertakan jeda animasi
+      if (!rawText || rawText.length === 0) {
+        if (options.onComplete) options.onComplete();
+        return true;
+      }
+
+      this.isTyping = true;
+      this.abortRequested = false;
+
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+
+      this.focusEditor();
+      this.ensureNormalFont();
+      await new Promise((res) => setTimeout(res, 40));
+      this.focusEditor();
+
+      const target = this.getEditorTarget();
+      const iframe = this.getEditorIframe();
+      if (!target) {
+        this.isTyping = false;
+        if (options.onError) options.onError("Target editor Google Docs tidak ditemukan.");
+        return false;
+      }
+
+      const cleanText = this.cleanMarkdownForDocs(rawText);
+      const paragraphs = this.splitIntoParagraphs(cleanText);
+      const total = paragraphs.length;
+
+      if (total === 0) {
+        this.isTyping = false;
+        if (options.onComplete) options.onComplete();
+        return true;
+      }
+
+      for (let i = 0; i < total; i++) {
+        if (this.abortRequested) {
+          this.isTyping = false;
+          this.abortRequested = false;
+          if (options.onCancel) options.onCancel();
+          return false;
+        }
+
+        this.ensureNormalFont();
+
+        const p = paragraphs[i];
+        const lines = p.split(/\r?\n/);
+
+        for (let l = 0; l < lines.length; l++) {
+          if (this.abortRequested) break;
+
+          const line = lines[l].trim();
+          if (line) {
+            const chars = Array.from(line);
+            for (let c = 0; c < chars.length; c++) {
+              if (this.abortRequested) break;
+              this.insertChar(chars[c], target, iframe);
+
+              if (charDelayMs > 0) {
+                await new Promise((res) => setTimeout(res, charDelayMs));
+              } else if (c % 120 === 0 && c > 0) {
+                await new Promise((res) => setTimeout(res, 0));
+              }
+            }
+          }
+
+          if (l < lines.length - 1) {
+            this.insertNewline(target, iframe);
+            if (charDelayMs > 0) {
+              await new Promise((res) => setTimeout(res, Math.max(20, charDelayMs * 2)));
+            }
+          }
+        }
+
+        const percent = Math.round(((i + 1) / total) * 100);
+        if (options.onProgress) {
+          options.onProgress({
+            current: i + 1,
+            total,
+            percent,
+            paragraphIndex: i + 1,
+            totalParagraphs: total
+          });
+        }
+
+        if (i < total - 1) {
+          this.insertNewline(target, iframe);
+          this.insertNewline(target, iframe);
+
+          if (paragraphDelayMs > 0) {
+            await new Promise((res) => setTimeout(res, paragraphDelayMs));
+          }
+        }
+      }
+
+      this.isTyping = false;
+      if (options.onComplete) options.onComplete();
+      return true;
+    },
+
     instantInsert(rawText, options = {}) {
-      return this.typeParagraphs(rawText, {
-        charDelayMs: 0,
-        paragraphDelayMs: 0,
-        ...options
-      });
+      return this.typeDraft(rawText, options);
     },
 
     async typeStream(text, options = {}) {
       const { speedMs, paragraphDelayMs, charDelayMs, ...rest } = options;
-      const cDelay = charDelayMs !== undefined
-        ? charDelayMs
-        : (speedMs ? Math.max(3, parseInt(speedMs, 10)) : 6);
-      const pDelay = paragraphDelayMs !== undefined
-        ? paragraphDelayMs
-        : (cDelay ? Math.max(120, cDelay * 25) : 240);
-
+      // Protokol resmi: default langsung selesai satu draf tanpa penundaan
+      if (!speedMs && !paragraphDelayMs && !charDelayMs) {
+        return this.typeDraft(text, rest);
+      }
       return this.typeParagraphs(text, {
-        charDelayMs: cDelay,
-        paragraphDelayMs: pDelay,
+        charDelayMs: charDelayMs || (speedMs ? parseInt(speedMs, 10) : 0),
+        paragraphDelayMs: paragraphDelayMs || 0,
         ...rest
       });
     },
