@@ -146,12 +146,12 @@
   }
 
   // ==========================================================================
-  // DOM Mount: Left-Corner Dock & Wide Gemini Web Overlay
+  // DOM Mount: Bottom-Right Dock & Wide Gemini Web Overlay
   // ==========================================================================
   const root = document.createElement("div");
   root.id = "docs-gemini-agent-root";
   root.innerHTML = `
-    <!-- Left-Corner Dock Navigation (GType / Gemini) -->
+    <!-- Bottom-Right Floating Dock Navigation (Gemini) -->
     <div id="gemini-dock-nav" class="gemini-dock-nav" title="Buka Gemini Docs (Alt+G)">
       <svg class="gemini-dock-sparkle" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>

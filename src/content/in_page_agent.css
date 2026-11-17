@@ -6,7 +6,7 @@
  */
 
 /* ==========================================================================
-   Root Container & Left Corner Dock Navigation
+   Root Container & Floating Dock Navigation (Bottom Right)
    ========================================================================== */
 #docs-gemini-agent-root {
   position: static;
@@ -17,11 +17,11 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Floating Dock Navigation in Left Corner */
+/* Floating Dock Navigation in Bottom Right Corner */
 .gemini-dock-nav {
   position: fixed;
   bottom: 24px;
-  left: 24px;
+  right: 24px;
   z-index: 2147483645;
   display: flex;
   align-items: center;
