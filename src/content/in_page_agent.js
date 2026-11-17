@@ -14,13 +14,59 @@
       return { discussionText: "", draftText: "", hasDraft: false };
     }
 
-    const match = rawText.match(/<<<DRAF_DOKUMEN>>>([\s\S]*?)<<<AKHIR_DRAF_DOKUMEN>>>/);
-    if (match) {
-      const draftText = match[1].trim();
-      const discussionText = rawText.replace(/<<<DRAF_DOKUMEN>>>[\s\S]*?<<<AKHIR_DRAF_DOKUMEN>>>/, "").trim();
+    // 1. Pencocokan tag draf lengkap (fleksibel kurung sudut dan spasi)
+    const fullMatch = rawText.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}([\s\S]*?)<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+    if (fullMatch) {
+      const draftText = fullMatch[1].trim();
+      const discussionText = rawText.replace(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}[\s\S]*?<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i, "").trim();
       return {
         discussionText,
         draftText,
+        hasDraft: true
+      };
+    }
+
+    // 2. Jika hanya tag penutup yang muncul
+    const closeMatch = rawText.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+    if (closeMatch) {
+      const before = rawText.substring(0, closeMatch.index).trim();
+      const after = rawText.substring(closeMatch.index + closeMatch[0].length).trim();
+      const headingMatch = before.match(/(?:^|\n\n)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
+      if (headingMatch && headingMatch.index !== undefined) {
+        const splitIdx = headingMatch.index === 0 ? 0 : headingMatch.index + 2;
+        const discHead = before.substring(0, splitIdx).trim();
+        const draft = before.substring(splitIdx).trim();
+        const discussionText = (discHead ? discHead + "\n\n" : "") + after;
+        return {
+          discussionText: discussionText.trim(),
+          draftText: draft,
+          hasDraft: true
+        };
+      }
+      return {
+        discussionText: after,
+        draftText: before,
+        hasDraft: true
+      };
+    }
+
+    // 3. Fallback tanpa tag: Pisahkan sapaan obrolan di awal jika naskah berisi judul akademik
+    const headingMatch = rawText.match(/(?:^|\n\n)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
+    if (headingMatch && headingMatch.index !== undefined && headingMatch.index > 0) {
+      const splitIdx = headingMatch.index + 2;
+      const discHead = rawText.substring(0, splitIdx).trim();
+      let draft = rawText.substring(splitIdx).trim();
+
+      const trailMatch = draft.match(/\n+(?:Bagaimana menurut Anda|Apakah Anda|Silakan beritahu|Jika Anda ingin).*$/is);
+      let discTail = "";
+      if (trailMatch && trailMatch.index !== undefined) {
+        discTail = draft.substring(trailMatch.index).trim();
+        draft = draft.substring(0, trailMatch.index).trim();
+      }
+      const discussionText = (discHead ? discHead + "\n\n" : "") + discTail;
+      return {
+        discussionText: discussionText.trim(),
+        draftText: draft,
         hasDraft: true
       };
     }
