@@ -77,12 +77,30 @@
       return { discussionText: "", draftText: "", hasDraft: false };
     }
 
-    // 1. Tag draf lengkap
-    const fullMatch = rawText.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}([\s\S]*?)<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
-    if (fullMatch) {
-      const draftText = fullMatch[1].trim();
-      const discussionText = rawText.replace(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}[\s\S]*?<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i, "").trim();
-      return { discussionText, draftText, hasDraft: true };
+    // 1. Tag draf lengkap atau tag pembuka yang terpotong (unclosed)
+    const openMatch = rawText.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+    if (openMatch) {
+      const discussionHead = rawText.substring(0, openMatch.index).trim();
+      const afterOpen = rawText.substring(openMatch.index + openMatch[0].length);
+
+      const closeMatch = afterOpen.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+      let draftText = "";
+      let discussionTail = "";
+
+      if (closeMatch) {
+        draftText = afterOpen.substring(0, closeMatch.index).trim();
+        discussionTail = afterOpen.substring(closeMatch.index + closeMatch[0].length).trim();
+      } else {
+        // Output terpotong di tengah jalan atau tidak ada tag penutup: seluruh isi setelah pembuka adalah draf
+        draftText = afterOpen.trim();
+      }
+
+      const discussionText = [discussionHead, discussionTail].filter(Boolean).join("\n\n");
+      return {
+        discussionText: discussionText.trim(),
+        draftText: draftText.trim(),
+        hasDraft: Boolean(draftText)
+      };
     }
 
     // 2. Tag penutup saja
@@ -90,9 +108,9 @@
     if (closeMatch) {
       const before = rawText.substring(0, closeMatch.index).trim();
       const after = rawText.substring(closeMatch.index + closeMatch[0].length).trim();
-      const headingMatch = before.match(/(?:^|\n\n)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
+      const headingMatch = before.match(/(?:^|\n+)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
       if (headingMatch && headingMatch.index !== undefined) {
-        const splitIdx = headingMatch.index === 0 ? 0 : headingMatch.index + 2;
+        const splitIdx = headingMatch.index === 0 ? 0 : headingMatch.index;
         const discHead = before.substring(0, splitIdx).trim();
         const draft = before.substring(splitIdx).trim();
         const discussionText = (discHead ? discHead + "\n\n" : "") + after;
@@ -102,11 +120,13 @@
     }
 
     // 3. Header akademis natural (BAB 1 / DAFTAR ISI)
-    const headingMatch = rawText.match(/(?:^|\n\n)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
-    if (headingMatch && headingMatch.index !== undefined && headingMatch.index > 0) {
-      const splitIdx = headingMatch.index + 2;
-      const discHead = rawText.substring(0, splitIdx).trim();
-      let draft = rawText.substring(splitIdx).trim();
+    const headingMatch = rawText.match(/(?:^|\n+)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
+    if (headingMatch && headingMatch.index !== undefined) {
+      if (headingMatch.index === 0) {
+        return { discussionText: "", draftText: rawText.trim(), hasDraft: true };
+      }
+      const discHead = rawText.substring(0, headingMatch.index).trim();
+      let draft = rawText.substring(headingMatch.index).trim();
 
       const trailMatch = draft.match(/\n+(?:Bagaimana menurut Anda|Apakah Anda|Silakan beritahu|Jika Anda ingin).*$/is);
       let discTail = "";
@@ -114,11 +134,17 @@
         discTail = draft.substring(trailMatch.index).trim();
         draft = draft.substring(0, trailMatch.index).trim();
       }
-      const discussionText = (discHead ? discHead + "\n\n" : "") + discTail;
+      const discussionText = [discHead, discTail].filter(Boolean).join("\n\n");
       return { discussionText: discussionText.trim(), draftText: draft, hasDraft: true };
     }
 
-    return { discussionText: rawText.trim(), draftText: rawText.trim(), hasDraft: false };
+    // Bersihkan sisa tag jika ada yang tertinggal
+    const cleanText = rawText
+      .replace(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/gi, "")
+      .replace(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/gi, "")
+      .trim();
+
+    return { discussionText: cleanText, draftText: cleanText, hasDraft: false };
   }
 
   // ==========================================================================

@@ -17,16 +17,14 @@ export const AIClient = {
     const defaultModel = "gemini-3.5-flash";
     let chosenModel = model || defaultModel;
 
-    // Normalize deprecated models
+    // Normalize deprecated models to modern supported versions
     if (chosenModel.includes("gemini-2.5") || chosenModel.includes("gemini-2.0") || chosenModel.includes("gemini-1.5")) {
       chosenModel = chosenModel.includes("pro") ? "gemini-3.8-pro" : defaultModel;
     }
 
-    // Fast-fallback chain: Preferred model first, then ultra-reliable gemini-3.5-flash-lite
-    const modelsToTry = [chosenModel];
-    if (chosenModel !== "gemini-3.5-flash-lite") {
-      modelsToTry.push("gemini-3.5-flash-lite");
-    }
+    // High availability fallback pool (tested & verified active endpoints)
+    const fallbackPool = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"];
+    const modelsToTry = [chosenModel, ...fallbackPool.filter(m => m !== chosenModel)];
 
     // Prepare contents array
     let contentsPayload = [];
@@ -39,79 +37,94 @@ export const AIClient = {
     let lastError = null;
 
     for (const currentModel of modelsToTry) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
-      const payload = {
-        contents: contentsPayload,
-        generationConfig: {
-          temperature: parseFloat(temperature) || 0.35,
-          topP: 0.95,
-          maxOutputTokens: 8192
-        }
-      };
+      let attempt = 0;
+      const maxAttempts = 2;
 
-      if (systemDirective) {
-        payload.systemInstruction = {
-          parts: [{ text: systemDirective }]
+      while (attempt < maxAttempts) {
+        attempt++;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: contentsPayload,
+          generationConfig: {
+            temperature: parseFloat(temperature) || 0.35,
+            topP: 0.95,
+            maxOutputTokens: 8192
+          }
         };
-      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        try {
-          controller.abort(new Error("Batas waktu (timeout) terlampaui. Server AI membutuhkan waktu lebih lama untuk memproses permintaan ini."));
-        } catch {
-          controller.abort();
+        if (systemDirective) {
+          payload.systemInstruction = {
+            parts: [{ text: systemDirective }]
+          };
         }
-      }, DEFAULT_TIMEOUT_MS);
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          try {
+            controller.abort(new Error("Batas waktu (timeout) terlampaui. Server AI membutuhkan waktu lebih lama untuk memproses permintaan ini."));
+          } catch {
+            controller.abort();
+          }
+        }, DEFAULT_TIMEOUT_MS);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const message = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
 
-          // If systemInstruction is rejected, try again without it
-          if (payload.systemInstruction && message.toLowerCase().includes("systeminstruction")) {
-            delete payload.systemInstruction;
-            const retryRes = await fetch(endpoint, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-            });
-            if (retryRes.ok) {
-              const retryData = await retryRes.json();
-              const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (retryText) return retryText.trim();
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const message = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+
+            // Handle temporary Google server 503 high demand or 429 rate spikes with backoff retry
+            const isHighDemand = response.status === 503 || response.status === 429 || message.toLowerCase().includes("high demand") || message.toLowerCase().includes("spikes in demand");
+            if (isHighDemand && attempt < maxAttempts) {
+              console.warn(`[GTyipe] ${currentModel} returned 503 high demand. Retrying in 1.5s (attempt ${attempt}/${maxAttempts})...`);
+              await new Promise(r => setTimeout(r, 1500));
+              continue;
             }
+
+            // If systemInstruction is rejected, try again without it
+            if (payload.systemInstruction && message.toLowerCase().includes("systeminstruction")) {
+              delete payload.systemInstruction;
+              const retryRes = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+              });
+              if (retryRes.ok) {
+                const retryData = await retryRes.json();
+                const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (retryText) return retryText.trim();
+              }
+            }
+
+            throw new Error(`Gemini API Error (${currentModel}): ${message}`);
           }
 
-          throw new Error(`Gemini API Error (${currentModel}): ${message}`);
-        }
+          const data = await response.json();
+          const candidate = data.candidates?.[0];
+          const text = candidate?.content?.parts?.[0]?.text;
 
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-        const text = candidate?.content?.parts?.[0]?.text;
+          if (!text) {
+            throw new Error(`Model ${currentModel} tidak menghasilkan respons teks yang valid.`);
+          }
 
-        if (!text) {
-          throw new Error(`Model ${currentModel} tidak menghasilkan respons teks yang valid.`);
+          return text.trim();
+        } catch (err) {
+          clearTimeout(timeoutId);
+          if (err.name === "AbortError" || (err.message && err.message.toLowerCase().includes("abort"))) {
+            lastError = new Error("Permintaan timeout: Server AI membutuhkan waktu lebih lama untuk merespons permintaan ini. Silakan coba lagi.");
+          } else {
+            lastError = err;
+          }
+          console.warn(`[GTyipe] Request to ${currentModel} failed (attempt ${attempt}):`, lastError.message);
+          if (attempt >= maxAttempts) break;
         }
-
-        return text.trim();
-      } catch (err) {
-        clearTimeout(timeoutId);
-        if (err.name === "AbortError" || (err.message && err.message.toLowerCase().includes("abort"))) {
-          lastError = new Error("Permintaan timeout: Server AI membutuhkan waktu lebih lama untuk merespons permintaan ini. Silakan coba lagi.");
-        } else {
-          lastError = err;
-        }
-        console.warn(`[GTyipe] Request to ${currentModel} failed or timed out:`, lastError.message);
       }
     }
 
