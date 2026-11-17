@@ -9,6 +9,154 @@
     cachedProfile: null,
 
     /**
+     * Dapatkan judul dokumen aktif Google Docs.
+     */
+    getDocTitle() {
+      const titleInput = document.querySelector(".docs-title-input") || document.querySelector("#docs-title-widget input");
+      if (titleInput && titleInput.value && titleInput.value.trim()) {
+        return titleInput.value.trim();
+      }
+      const labelInner = document.querySelector(".docs-title-input-label-inner");
+      if (labelInner && labelInner.textContent && labelInner.textContent.trim()) {
+        return labelInner.textContent.trim();
+      }
+      const rawTitle = document.title || "";
+      const cleaned = rawTitle.replace(/\s*-\s*Google (?:Dokumen|Docs).*$/i, "").trim();
+      return cleaned || "Dokumen Google Docs";
+    },
+
+    /**
+     * Ekstraksi teks lengkap, outline, statistik, dan titik henti penulisan dokumen.
+     */
+    extractFullDocument(maxLength = 50000) {
+      const docTitle = this.getDocTitle();
+      const paragraphs = [];
+
+      // 1. Primary: Ambil setiap alinea dari .kix-paragraphrenderer
+      const rendererNodes = document.querySelectorAll(".kix-paragraphrenderer");
+      if (rendererNodes && rendererNodes.length > 0) {
+        for (const node of rendererNodes) {
+          const raw = (node.innerText || node.textContent || "")
+            .replace(/\u00A0/g, " ")
+            .replace(/\u200B/g, "")
+            .trim();
+          if (raw && raw.length > 0) {
+            paragraphs.push(raw);
+          }
+        }
+      }
+
+      // 2. Fallback: Ekstrak dari .kix-lineview jika paragraphrenderer kosong
+      if (paragraphs.length === 0) {
+        const lineNodes = document.querySelectorAll(".kix-lineview");
+        let currentPara = [];
+        for (const line of lineNodes) {
+          const raw = (line.innerText || line.textContent || "")
+            .replace(/\u00A0/g, " ")
+            .replace(/\u200B/g, "")
+            .trim();
+          if (raw) {
+            currentPara.push(raw);
+          } else if (currentPara.length > 0) {
+            paragraphs.push(currentPara.join(" "));
+            currentPara = [];
+          }
+        }
+        if (currentPara.length > 0) {
+          paragraphs.push(currentPara.join(" "));
+        }
+      }
+
+      // 3. Fallback: Ekstrak dari .kix-appview-editor
+      if (paragraphs.length === 0) {
+        const editor = document.querySelector(".kix-appview-editor");
+        if (editor) {
+          const raw = (editor.innerText || "")
+            .replace(/\u00A0/g, " ")
+            .replace(/\u200B/g, "");
+          const lines = raw.split(/\n+/).map(p => p.trim()).filter(Boolean);
+          for (const l of lines) {
+            paragraphs.push(l);
+          }
+        }
+      }
+
+      // Bersihkan dan de-duplikasi paragraf yang berulang akibat rendering ganda
+      const cleanParagraphs = [];
+      for (let i = 0; i < paragraphs.length; i++) {
+        const p = paragraphs[i];
+        if (i === 0 || p !== paragraphs[i - 1]) {
+          cleanParagraphs.push(p);
+        }
+      }
+
+      const fullText = cleanParagraphs.join("\n\n").slice(0, maxLength);
+      const totalWords = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
+      const totalChars = fullText.length;
+
+      // Ekstrak struktur bab / outline dokumen
+      const outline = [];
+      const outlineItems = document.querySelectorAll(
+        ".navigation-item, .docs-navigation-tab-button, .docs-navigation-item, [role='treeitem']"
+      );
+      if (outlineItems && outlineItems.length > 0) {
+        for (const item of outlineItems) {
+          const t = item.textContent?.trim();
+          if (t && t.length > 2 && !outline.includes(t)) {
+            outline.push(t);
+          }
+        }
+      }
+
+      // Deteksi heading dari baris paragraf
+      for (const p of cleanParagraphs) {
+        if (/^BAB\s+(?:[IVXLCDM]+|\d+)/i.test(p) || /^\d+\.\d+(\.\d+)?\s+[A-Z]/i.test(p) || /^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|ABSTRAK|KATA\s+PENGANTAR)$/i.test(p)) {
+          if (!outline.includes(p)) {
+            outline.push(p);
+          }
+        }
+      }
+
+      // Identifikasi bagian akhir / titik henti pengetikan dokumen
+      const lastParagraphs = cleanParagraphs.slice(-3);
+      const lastParagraphText = cleanParagraphs.length > 0 ? cleanParagraphs[cleanParagraphs.length - 1] : "";
+
+      let lastHeading = "";
+      for (let i = cleanParagraphs.length - 1; i >= 0; i--) {
+        const p = cleanParagraphs[i];
+        if (/^BAB\s+(?:[IVXLCDM]+|\d+)/i.test(p) || /^\d+\.\d+(\.\d+)?\s+[A-Z]/i.test(p) || /^(?:DAFTAR\s+ISI|DAFTAR\s+PUSTAKA|ABSTRAK|KATA\s+PENGANTAR)$/i.test(p)) {
+          lastHeading = p;
+          break;
+        }
+      }
+      if (!lastHeading && outline.length > 0) {
+        lastHeading = outline[outline.length - 1];
+      }
+
+      let continuationHint = "";
+      if (lastHeading) {
+        continuationHint = `Naskah terakhir berada pada '${lastHeading}'.`;
+      }
+      if (lastParagraphText) {
+        continuationHint += ` Alinea terakhir: "${lastParagraphText.slice(0, 160)}${lastParagraphText.length > 160 ? '...' : ''}". Pengetikan kelanjutan siap disambung di akhir dokumen.`;
+      }
+
+      return {
+        docTitle,
+        fullText,
+        paragraphs: cleanParagraphs,
+        outline,
+        lastHeading,
+        lastParagraphs,
+        lastParagraphText,
+        continuationHint,
+        wordCount: totalWords,
+        paragraphCount: cleanParagraphs.length,
+        charCount: totalChars
+      };
+    },
+
+    /**
      * Detect the active or dominant font family in the document.
      */
     detectFontFamily() {
@@ -327,23 +475,8 @@
      * Extract a representative text sample from rendered document nodes.
      */
     sampleDocumentText(maxLength = 2500) {
-      const textNodes = document.querySelectorAll(
-        ".kix-paragraphrenderer, .kix-lineview-text-block, .kix-appview-editor"
-      );
-
-      const collected = [];
-      let totalLen = 0;
-
-      for (const node of textNodes) {
-        const txt = node.textContent?.trim();
-        if (txt && txt.length > 5) {
-          collected.push(txt);
-          totalLen += txt.length;
-          if (totalLen >= maxLength) break;
-        }
-      }
-
-      return collected.join("\n").slice(0, maxLength);
+      const doc = this.extractFullDocument(maxLength);
+      return doc.fullText || "";
     },
 
     /**
@@ -435,8 +568,8 @@
       const alignment = this.detectAlignment();
       const lineSpacing = this.detectLineSpacing();
       const indentStyle = this.detectIndentStyle();
-      const sampleExcerpt = this.sampleDocumentText(2000);
-      const { writingStyle, headingPattern, genreTag } = this.detectToneAndStructure(sampleExcerpt);
+      const docInfo = this.extractFullDocument(50000);
+      const { writingStyle, headingPattern, genreTag } = this.detectToneAndStructure(docInfo.fullText);
 
       // Create human-friendly badge summary for UI
       const cleanAlign = alignment.includes("Justify") ? "Justify" : "Rata Kiri";
@@ -444,6 +577,7 @@
       const badgeText = `${fontFamily} ${fontSize} • Spasi ${cleanSpacing} • ${cleanAlign} • ${genreTag}`;
 
       const profile = {
+        docTitle: docInfo.docTitle || "Dokumen Google Docs",
         fontFamily,
         fontSize,
         margins,
@@ -455,8 +589,17 @@
         headingPattern,
         genreTag,
         isSkripsiMargin,
+        outline: docInfo.outline || [],
+        lastHeading: docInfo.lastHeading || "",
+        lastParagraphs: docInfo.lastParagraphs || [],
+        lastParagraphText: docInfo.lastParagraphText || "",
+        continuationHint: docInfo.continuationHint || "",
+        wordCount: docInfo.wordCount || 0,
+        paragraphCount: docInfo.paragraphCount || 0,
+        charCount: docInfo.charCount || 0,
+        fullText: docInfo.fullText || "",
+        sampleExcerpt: docInfo.fullText ? docInfo.fullText.slice(0, 1500) : "",
         badgeText,
-        sampleExcerpt: sampleExcerpt ? sampleExcerpt.slice(0, 800) : "",
         timestamp: Date.now()
       };
 

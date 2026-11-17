@@ -44,7 +44,7 @@ export const ActionHandlers = {
     }
   },
 
-  async autoTypeToDocs(text, speedMs = 0, targetSection = null) {
+  async autoTypeToDocs(text, speedMs = 0, targetSection = null, targetPosition = "end") {
     if (!text) throw new Error("Tidak ada konten untuk diketik.");
     const tab = await this.getActiveTab();
     if (!tab?.id) throw new Error("Tab Google Docs tidak ditemukan.");
@@ -53,7 +53,8 @@ export const ActionHandlers = {
       action: "AUTO_TYPE_REVISION",
       text,
       speedMs: 0,
-      targetSection
+      targetSection,
+      targetPosition
     });
   },
 

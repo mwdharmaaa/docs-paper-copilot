@@ -109,13 +109,18 @@
         return false;
       }
 
-      window.DocsBridge.injectText(text);
-      sendResponse({ success: true });
+      (async () => {
+        if (window.CursorNavigator) {
+          await window.CursorNavigator.ensureContinuationPosition();
+        }
+        window.DocsBridge.injectText(text);
+        sendResponse({ success: true });
+      })();
       return true;
     }
 
     if (request.action === "AUTO_TYPE_REVISION") {
-      const { text, targetSection } = request;
+      const { text, targetSection, targetPosition = "end" } = request;
       if (!text) {
         sendResponse({ success: false, error: "Empty text payload" });
         return false;
@@ -124,11 +129,16 @@
       async function executeAutoType() {
         if (targetSection && window.CursorNavigator) {
           await window.CursorNavigator.moveToSection(targetSection);
+        } else if (window.CursorNavigator) {
+          await window.CursorNavigator.ensureContinuationPosition();
         }
 
         if (window.AutoTyper) {
           return new Promise((resolve) => {
             window.AutoTyper.typeDraft(text, {
+              targetPosition: targetPosition || "end",
+              targetSection,
+              isContinuation: true,
               onComplete: () => {
                 showDocsNotification("Selesai memasukkan satu draf ke dokumen.");
                 resolve({ success: true, completed: true });

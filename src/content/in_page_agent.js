@@ -324,8 +324,9 @@
             <!-- Bottom Floating Prompt Bar -->
             <div class="gemini-prompt-bar-area">
               <div class="gemini-quick-chips-row">
+                <button type="button" class="gemini-chip-btn" data-prompt="Analisis dokumen ini secara lengkap: judul, jenis font, ukuran, margin, spasi, struktur bab, dan ringkasan isi yang sudah tersedia.">Analisa Dokumen</button>
+                <button type="button" class="gemini-chip-btn" data-prompt="Lanjutkan pengetikan naskah dokumen ini langsung dari titik henti terakhir. Tulis alinea selanjutnya secara berkesinambungan dan berbobot tanpa mengulang apa yang sudah ada.">Lanjutkan Naskah</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Tuliskan draf pembuka tentang urgensi topik ini">Draf Pembuka</button>
-                <button type="button" class="gemini-chip-btn" data-prompt="Lanjutkan paragraf ini dengan argumen ilmiah dan landasan teori yang kuat">Lanjutkan Naskah</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Koreksi salah ketik, tanda baca, dan tata bahasa PUEBI pada teks ini">Koreksi PUEBI</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Parafrase bagian ini menggunakan sudut pandang pasif formal">Parafrase Formal</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Susun Daftar Isi lengkap dengan perataan dot leaders dan nomor halaman tanpa indentasi tab">Daftar Isi Rapi</button>
@@ -562,7 +563,7 @@
   // Autonomous Typing to Google Docs Engine
   // Sesuai TYPING_PROTOCOL.md: 14pt Center Bab, 12pt Justify Body + 1x Tab, No SpellWiz
   // ==========================================================================
-  function startTypingToDocs(textToType) {
+  function startTypingToDocs(textToType, targetPosition = "end") {
     if (!textToType || !textToType.trim()) {
       statusText.textContent = "Tidak ada draf yang dapat dimasukkan.";
       return;
@@ -579,8 +580,8 @@
 
     isTypingInProgress = true;
     dockNav.classList.add("typing");
-    dockStatus.textContent = "Mengetik draf (0%)...";
-    statusText.textContent = "Memasukkan draf lengkap ke Google Docs...";
+    dockStatus.textContent = "Menyiapkan posisi & kursor...";
+    statusText.textContent = "Memposisikan kursor ke tempat kelanjutan naskah & mengetik...";
 
     if (dockControlBtn) {
       dockControlBtn.style.display = "inline-flex";
@@ -594,6 +595,8 @@
     if (window.AutoTyper) {
       setTimeout(() => {
         window.AutoTyper.typeDraft(cleanContent, {
+          targetPosition: targetPosition || "end",
+          isContinuation: true,
           onProgress: (p) => {
             const pctMsg = `Mengetik (${p.percent}%)...`;
             dockStatus.textContent = pctMsg;
@@ -747,7 +750,7 @@
         }
       };
 
-      // 3. SUB: Insert Langsung
+      // 3. SUB: Insert Langsung (Sesuai posisi kelanjutan)
       const btnInsert = document.createElement("button");
       btnInsert.type = "button";
       btnInsert.className = "gemini-action-btn-sub";
@@ -759,10 +762,13 @@
         </svg>
         <span>Insert</span>
       `;
-      btnInsert.onclick = () => {
+      btnInsert.onclick = async () => {
+        if (window.CursorNavigator) {
+          await window.CursorNavigator.ensureContinuationPosition();
+        }
         if (window.DocsBridge && window.DocsBridge.injectText) {
           window.DocsBridge.injectText(targetDraftContent);
-          statusText.textContent = "Draf berhasil dimasukkan ke posisi kursor.";
+          statusText.textContent = "Draf berhasil dimasukkan ke posisi kelanjutan naskah.";
         } else {
           navigator.clipboard.writeText(targetDraftContent);
           statusText.textContent = "Draf disalin ke clipboard.";
@@ -810,10 +816,21 @@
     textareaInput.value = "";
     autoResizeTextarea();
     sendBtn.disabled = true;
-    statusText.textContent = "Gemini sedang memproses & menyusun draf dokumen...";
+    statusText.textContent = "Gemini sedang menganalisis dokumen & menyusun jawaban...";
 
     const selected = getSelectedDocText();
-    const profile = activePageProfile || (window.PageLearner ? window.PageLearner.getProfile() : null);
+    // Selalu ambil profil dan analisis teks naskah terkini secara real-time
+    const profile = window.PageLearner ? window.PageLearner.learnPage() : activePageProfile;
+    activePageProfile = profile;
+    updateLearnedPageProfile(false);
+
+    // Deteksi cerdas jika pengguna meminta melanjutkan pengetikan naskah
+    const lower = text.toLowerCase();
+    const isContinuation = lower.includes("lanjut") || lower.includes("sambung") || lower.includes("berikutnya") || lower.includes("teruskan");
+    let promptToSend = text;
+    if (isContinuation && profile?.lastParagraphText && (text.length < 35 || text.includes("Lanjutkan Naskah"))) {
+      promptToSend = `Lanjutkan pengetikan naskah dokumen ini langsung dari titik henti terakhir. Alinea terakhir saat ini: "${profile.lastParagraphText.slice(-250)}". Sambungkan dengan alinea berikutnya secara berkesinambungan dan berbobot tanpa mengulang apa yang sudah ada.`;
+    }
 
     try {
       if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
@@ -824,11 +841,12 @@
 
       chrome.runtime.sendMessage({
         type: "ASK_GEMINI",
-        prompt: text,
+        prompt: promptToSend,
         history: chatHistory.slice(0, -1),
         mode: "discuss",
         selectedContext: selected,
-        pageProfile: profile
+        pageProfile: profile,
+        isContinuation
       }, (res) => {
         sendBtn.disabled = false;
         if (chrome.runtime.lastError || !res?.success) {

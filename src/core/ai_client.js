@@ -223,10 +223,16 @@ export const AIClient = {
 
     const systemDirective = PromptTemplates.getSystemDirective(mode, pageProfile);
 
-    // Current turn text combining prompt and selection context if present
-    const contextPrefix = selectedContext && selectedContext.trim()
-      ? `[Teks Dokumen Aktif yang Ditandai Pengguna]:\n"""\n${selectedContext.trim()}\n"""\n\n`
-      : "";
+    // Current turn text combining prompt and selection context or active document header
+    let contextPrefix = "";
+    if (selectedContext && selectedContext.trim()) {
+      contextPrefix += `[Teks Dokumen yang Ditandai Pengguna]:\n"""\n${selectedContext.trim()}\n"""\n\n`;
+    } else if (pageProfile && pageProfile.docTitle) {
+      contextPrefix += `[Konteks Tab Google Docs Aktif: "${pageProfile.docTitle}" | Font: ${pageProfile.fontFamily} ${pageProfile.fontSize} | Spasi: ${pageProfile.lineSpacing} | Perataan: ${pageProfile.alignment} | Margin: ${pageProfile.margins}]\n`;
+      if (pageProfile.lastHeading) {
+        contextPrefix += `[Titik Henti Terakhir Naskah: ${pageProfile.lastHeading}]\n\n`;
+      }
+    }
     const currentPromptText = `${contextPrefix}${prompt.trim()}`;
 
     if (provider === "gemini") {

@@ -1118,6 +1118,22 @@
         return true;
       }
 
+      // SMART POSITIONING PROTOCOL:
+      // Pastikan pengetikan kelanjutan draf diarahkan ke tempat yang tepat (akhir dokumen / target section),
+      // BUKAN di posisi acak tempat pointer mouse pengguna diklik.
+      if (options.targetSection && CursorNavigator) {
+        await CursorNavigator.moveToSection(options.targetSection);
+        await new Promise((r) => setTimeout(r, 60));
+      } else if (options.targetPosition === "end" || options.isContinuation || options.targetPosition !== "cursor") {
+        if (CursorNavigator) {
+          await CursorNavigator.ensureContinuationPosition();
+          await new Promise((r) => setTimeout(r, 60));
+        }
+      }
+
+      target = this.getEditorTarget();
+      iframe = this.getEditorIframe();
+
       // Standarisasi awal naskah: Kalibrasi ke 12pt, unbold, dan Rata Kanan-Kiri (Justify)
       await this.calibrateTo12(target, iframe);
 
@@ -1411,64 +1427,137 @@
      */
     moveToTop() {
       const tgt = this.getEditorTarget();
-      if (!tgt) return false;
+      const ifr = this.getEditorIframe();
       AutoTyper.focusEditor();
 
-      tgt.dispatchEvent(new KeyboardEvent("keydown", {
-        key: "Home",
-        code: "Home",
-        keyCode: 36,
-        which: 36,
-        ctrlKey: true,
-        bubbles: true,
-        cancelable: true,
-        composed: true
-      }));
+      const eventTargets = [
+        tgt,
+        ifr?.contentDocument?.body,
+        ifr?.contentDocument,
+        ifr?.contentWindow,
+        document.activeElement
+      ].filter(Boolean);
 
-      tgt.dispatchEvent(new KeyboardEvent("keyup", {
-        key: "Home",
-        code: "Home",
-        keyCode: 36,
-        which: 36,
-        ctrlKey: true,
-        bubbles: true,
-        cancelable: true,
-        composed: true
-      }));
+      for (const t of eventTargets) {
+        try {
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Home",
+            code: "Home",
+            keyCode: 36,
+            which: 36,
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+          t.dispatchEvent(new KeyboardEvent("keyup", {
+            key: "Home",
+            code: "Home",
+            keyCode: 36,
+            which: 36,
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+        } catch {}
+      }
 
       return true;
     },
 
     /**
-     * Gerakkan kursor ke paling bawah dokumen (Ctrl + End).
+     * Gerakkan kursor ke paling bawah dokumen (Ctrl + End & klik garis naskah terakhir).
      */
-    moveToBottom() {
+    async moveToBottom() {
       const tgt = this.getEditorTarget();
-      if (!tgt) return false;
+      const ifr = this.getEditorIframe();
       AutoTyper.focusEditor();
 
-      tgt.dispatchEvent(new KeyboardEvent("keydown", {
-        key: "End",
-        code: "End",
-        keyCode: 35,
-        which: 35,
-        ctrlKey: true,
-        bubbles: true,
-        cancelable: true,
-        composed: true
-      }));
+      // 1. Coba klik ujung kanan baris/paragraf terakhir di DOM Docs
+      try {
+        const textNodes = document.querySelectorAll(
+          ".kix-paragraphrenderer, .kix-lineview, .kix-lineview-text-block"
+        );
+        if (textNodes && textNodes.length > 0) {
+          const lastEl = textNodes[textNodes.length - 1];
+          lastEl.scrollIntoView({ behavior: "instant", block: "end" });
+          const rect = lastEl.getBoundingClientRect();
+          if (rect && rect.width > 0) {
+            const clientX = rect.right - 2;
+            const clientY = rect.top + (rect.height / 2);
+            const mouseOpts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+            lastEl.dispatchEvent(new MouseEvent("mousedown", mouseOpts));
+            lastEl.dispatchEvent(new MouseEvent("mouseup", mouseOpts));
+            lastEl.dispatchEvent(new MouseEvent("click", mouseOpts));
+          }
+        }
+      } catch {}
 
-      tgt.dispatchEvent(new KeyboardEvent("keyup", {
-        key: "End",
-        code: "End",
-        keyCode: 35,
-        which: 35,
-        ctrlKey: true,
-        bubbles: true,
-        cancelable: true,
-        composed: true
-      }));
+      AutoTyper.focusEditor();
 
+      // 2. Dispatch Ctrl+End ke seluruh elemen editor dan iframe
+      const eventTargets = [
+        tgt,
+        ifr?.contentDocument?.body,
+        ifr?.contentDocument,
+        ifr?.contentWindow,
+        document.activeElement
+      ].filter(Boolean);
+
+      for (const t of eventTargets) {
+        try {
+          t.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "End",
+            code: "End",
+            keyCode: 35,
+            which: 35,
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+          t.dispatchEvent(new KeyboardEvent("keyup", {
+            key: "End",
+            code: "End",
+            keyCode: 35,
+            which: 35,
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+            composed: true
+          }));
+        } catch {}
+      }
+
+      return true;
+    },
+
+    /**
+     * PROTOKOL PENEMPATAN KELANJUTAN NASKAH RESMI:
+     * Menjamin kursor diposisikan di akhir naskah dokumen pada baris baru yang bersih,
+     * BUKAN di posisi acak tempat pointer mouse pengguna diklik.
+     */
+    async ensureContinuationPosition() {
+      AutoTyper.focusEditor();
+      await this.moveToBottom();
+      await new Promise((r) => setTimeout(r, 60));
+
+      const tgt = this.getEditorTarget();
+      const ifr = this.getEditorIframe();
+
+      // Jika dokumen sudah memiliki isi teks, masukkan baris baru (Enter) agar tidak menempel ke kalimat sebelumnya
+      const hasText = Boolean(
+        (window.PageLearner && window.PageLearner.getProfile()?.fullText?.trim()) ||
+        document.querySelector(".kix-lineview-text-block")
+      );
+
+      if (hasText) {
+        AutoTyper.typeEnter(tgt, ifr);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      AutoTyper.focusEditor();
       return true;
     },
 
@@ -1484,8 +1573,8 @@
       if (q.includes("paling atas") || q.includes("bagian atas") || q.includes("awal dokumen")) {
         return this.moveToTop();
       }
-      if (q.includes("paling bawah") || q.includes("bagian bawah") || q.includes("akhir dokumen")) {
-        return this.moveToBottom();
+      if (q.includes("paling bawah") || q.includes("bagian bawah") || q.includes("akhir dokumen") || q.includes("lanjut") || q.includes("kelanjutan")) {
+        return this.ensureContinuationPosition();
       }
 
       // 1. Coba klik Google Docs Document Outline jika query berupa Judul/Bab

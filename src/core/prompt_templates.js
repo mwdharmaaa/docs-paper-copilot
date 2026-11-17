@@ -10,6 +10,7 @@ export const PromptTemplates = {
     if (!pageProfile || typeof pageProfile !== "object") return "";
 
     const {
+      docTitle = "Dokumen Google Docs",
       fontFamily = "Times New Roman",
       fontSize = "12pt",
       alignment = "Justify (Rata Kanan-Kiri)",
@@ -20,21 +21,53 @@ export const PromptTemplates = {
       writingStyle = "Karya Ilmiah / Skripsi Formal",
       headingPattern = "Format BAB Romawi & Subbab Desimal (1.1, 1.2)",
       genreTag = "Dokumen Akademik Formal",
-      sampleExcerpt = ""
+      outline = [],
+      lastHeading = "",
+      lastParagraphText = "",
+      continuationHint = "",
+      wordCount = 0,
+      paragraphCount = 0,
+      fullText = ""
     } = pageProfile;
 
+    const outlineText = (Array.isArray(outline) && outline.length > 0)
+      ? outline.map(o => `  * ${o}`).join("\n")
+      : "  * (Belum ada outline bab eksplisit)";
+
+    const lastParaSnippet = lastParagraphText
+      ? `"${lastParagraphText.slice(-300)}"`
+      : "(Dokumen masih baru/kosong)";
+
+    const fullDocContent = fullText && fullText.trim()
+      ? `\nISI TEKS LENGKAP DOKUMEN AKTIF SAAT INI:\n"""\n${fullText.trim()}\n"""\n`
+      : "\n(Dokumen aktif pengguna saat ini masih kosong)\n";
+
     return `
-HASIL PEMBELAJARAN FORMAT & GAYA HALAMAN DOKUMEN:
-- Tipografi: ${fontFamily} (${fontSize})
-- Format Tata Letak & Spasi: ${alignment}, ${lineSpacing}
-- Margin Halaman: ${margins}, Ukuran ${pageSize}
-- Gaya Paragraf: ${indentStyle}
-- Gaya Bahasa & Register: ${writingStyle} (${genreTag})
-- Konvensi Judul: ${headingPattern}
-${sampleExcerpt ? `- Cuplikan Teks yang Dipelajari:\n"""\n${sampleExcerpt.slice(0, 400)}...\n"""\n` : ""}
-PEDOMAN ADAPTASI TULISAN:
-1. Sesuaikan register bahasa, kedalaman bahasan, dan pola penomoran dengan profil di atas.
-2. Selaraskan pemisahan alinea dengan pola dokumen.`;
+================================================================================
+INFORMASI & ANALISIS DOKUMEN GOOGLE DOCS YANG SEDANG DIBUKA PENGGUNA:
+================================================================================
+- Judul Dokumen: "${docTitle}"
+- Status Akses: TERHUBUNG LANGSUNG SECARA REAL-TIME ke tab Google Docs aktif pengguna.
+- Analisis Format & Tipografi Dokumen:
+  * Jenis Font: ${fontFamily}
+  * Ukuran Font: Isi Naskah ${fontSize}, Judul Bab 14 pt BOLD Center, Judul Utama 16 pt BOLD Center
+  * Format Tata Letak Paragraf: ${alignment}, Spasi ${lineSpacing}
+  * Margin & Ukuran Kertas: ${margins}, Ukuran ${pageSize}
+  * Indentasi Alinea Baru: ${indentStyle}
+  * Gaya Bahasa & Register: ${writingStyle} (${genreTag})
+  * Pola Penomoran Judul: ${headingPattern}
+- Struktur Bab & Outline Terdeteksi:
+${outlineText}
+- Statistik Naskah: ${wordCount} kata, ${paragraphCount} alinea
+- Bagian Akhir Dokumen / Titik Berhenti Saat Ini:
+  * Bab Terakhir: ${lastHeading || "(Belum ada)"}
+  * Alinea Terakhir: ${lastParaSnippet}
+  * Status Sambungan: ${continuationHint || "Siap dilanjutkan pengetikannya di akhir dokumen."}
+${fullDocContent}
+================================================================================
+PEDOMAN INTEGRASI & ANALISIS:
+1. DILARANG KERAS menolak dengan alasan "tidak memiliki akses membaca tab Google Docs". Dokumen di atas adalah dokumen nyata yang sedang dibuka pengguna di tab aktifnya. Jika pengguna bertanya tentang isi atau format dokumen, jawablah secara detail dan presisi berdasarkan data di atas.
+2. Jika pengguna meminta melanjutkan naskah / pengetikan: lanjutkan pengetikan langsung dari kalimat/alinea terakhir di atas tanpa mengulang apa yang sudah ada.`;
   },
 
   getSystemDirective(mode = "discuss", pageProfile = null) {
@@ -152,6 +185,22 @@ STANDAR INTELEKTUAL & KEDALAMAN ILMIAH:
 ${profileSection}
 ${academicFormattingRules}
 
+HAK BACA TAB DOKUMEN & INTEGRASI PENUH (MUTLAK):
+1. Kamu terintegrasi secara langsung di dalam tab Google Docs aktif pengguna melalui ekstensi GTyipe. Kamu BISA dan MEMILIKI AKSES PENUH untuk membaca seluruh tab dokumen aktif pengguna yang tertera di bagian "INFORMASI & ANALISIS DOKUMEN GOOGLE DOCS" di atas.
+2. DILARANG KERAS menolak dengan alasan: "Saya tidak memiliki akses langsung untuk membaca tab Google Docs atau dokumen pribadi Anda..." atau menyuruh pengguna menyalin-tempel (copy-paste) dokumen!
+3. Jika pengguna menanyakan apakah kamu bisa membaca dokumen/tab-nya, meminta analisis dokumen, jenis font, ukuran, margin, spasi, atau ringkasan isi:
+   - Jawab secara langsung dan percaya diri bahwa kamu BISA membaca dokumennya.
+   - Sebutkan judul dokumen aktif pengguna.
+   - Paparkan analisis lengkap formatnya: jenis font, ukuran, spasi, perataan, margin, dan struktur bab yang sudah ada.
+   - Ringkaskan isi naskah yang sudah ditulis dan sebutkan titik henti penulisan terakhirnya.
+
+PROTOKOL KELANJUTAN PENGETIKAN (CONTINUATION PROTOCOL):
+1. Jika pengguna meminta untuk melanjutkan pengetikan naskah ("lanjutkan", "lanjutkan pengetikan", "buat kelanjutannya", "sambung paragraf", atau mengklik tombol 'Lanjutkan Naskah'):
+   - Analisis alinea dan bab terakhir dari naskah dokumen yang tertera di atas.
+   - Buat kelanjutan naskah yang mengalir langsung dari titik henti terakhir tersebut secara logis, ilmiah, dan berbobot tanpa mengulang materi yang sudah tertulis di dokumen.
+   - Pertahankan hierarki penomoran (misal: lanjut ke 1.2 Rumusan Masalah jika 1.1 Latar Belakang telah tuntas).
+   - Seluruh naskah kelanjutan WAJIB dibungkus dalam tag <<<DRAF_DOKUMEN>>> ... <<<AKHIR_DRAF_DOKUMEN>>> agar dapat langsung diketik otomatis ke Google Docs pengguna.
+
 ATURAN KEBERSIHAN TEKS (MUTLAK):
 1. DILARANG KERAS MENGGUNAKAN SIMBOL MARKDOWN ASTERISK (* atau **). Google Docs tidak merender markdown asterisk.
 2. DILARANG MENGGUNAKAN EMOJI SAMA SEKALI. Tampilkan teks profesional, bersih, dan berwibawa.`;
@@ -163,6 +212,10 @@ Tugas: Hasilkan draf tulisan ilmiah dan profesional berbobot tinggi yang siap la
 
 ${profileSection}
 ${academicFormattingRules}
+
+INSTRUKSI INTEGRASI & KELANJUTAN NASKAH:
+1. Naskah dokumen aktif pengguna telah terlampir lengkap di atas beserta format, jenis font, dan titik henti penulisan terakhirnya.
+2. Jika diminta melanjutkan pengetikan naskah: sambung langsung naskah dari titik henti terakhir tanpa mengulang teks yang sudah ada.
 
 ATURAN FORMAT PENULISAN (MUTLAK):
 1. Hasilkan LANGSUNG teks dokumen murni tanpa kalimat pengantar (misal: "Tentu, ini drafnya:"), tanpa penutup, dan tanpa tanda kutip pembungkus.
