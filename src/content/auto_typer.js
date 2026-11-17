@@ -203,60 +203,95 @@
       }
     },
 
-    insertChunk(textChunk) {
-      if (!textChunk) return false;
+    insertChar(ch) {
+      if (ch === "\n" || ch === "\r") {
+        return this.insertNewline();
+      }
+
       const iframe = this.getEditorIframe();
       const target = this.getEditorTarget();
       if (!target) return false;
 
       this.focusEditor();
 
-      // Dispatch beforeinput
       try {
-        target.dispatchEvent(new InputEvent("beforeinput", {
-          inputType: "insertText",
-          data: textChunk,
+        const charCode = ch.charCodeAt(0);
+        let code = "";
+        if (ch >= "A" && ch <= "Z") code = "Key" + ch;
+        else if (ch >= "a" && ch <= "z") code = "Key" + ch.toUpperCase();
+        else if (ch >= "0" && ch <= "9") code = "Digit" + ch;
+        else if (ch === " ") code = "Space";
+
+        target.dispatchEvent(new KeyboardEvent("keydown", {
+          key: ch,
+          code: code,
+          keyCode: charCode,
+          which: charCode,
           bubbles: true,
           cancelable: true,
           composed: true
         }));
-      } catch {}
 
-      // Execute atomic insertText into Google Docs iframe
-      let inserted = false;
-      if (iframe && iframe.contentDocument) {
-        try {
-          inserted = iframe.contentDocument.execCommand("insertText", false, textChunk);
-        } catch {}
-      }
+        target.dispatchEvent(new KeyboardEvent("keypress", {
+          key: ch,
+          code: code,
+          charCode: charCode,
+          keyCode: charCode,
+          which: charCode,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
 
-      // Fallback via clipboard paste event if execCommand failed
-      if (!inserted) {
-        try {
-          const dt = new DataTransfer();
-          dt.setData("text/plain", textChunk);
-          const pasteEvent = new ClipboardEvent("paste", {
-            clipboardData: dt,
-            bubbles: true,
-            cancelable: true
-          });
-          target.dispatchEvent(pasteEvent);
-          inserted = true;
-        } catch {}
-      }
+        target.dispatchEvent(new InputEvent("beforeinput", {
+          inputType: "insertText",
+          data: ch,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
 
-      // Dispatch input event
-      try {
+        if (iframe && iframe.contentDocument) {
+          try {
+            iframe.contentDocument.execCommand("insertText", false, ch);
+          } catch {}
+        }
+
         target.dispatchEvent(new InputEvent("input", {
           inputType: "insertText",
-          data: textChunk,
+          data: ch,
           bubbles: true,
           cancelable: false,
           composed: true
         }));
-      } catch {}
 
-      return inserted;
+        target.dispatchEvent(new KeyboardEvent("keyup", {
+          key: ch,
+          code: code,
+          keyCode: charCode,
+          which: charCode,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+
+        return true;
+      } catch (err) {
+        console.warn("[AutoTyper] insertChar failed:", err);
+        return false;
+      }
+    },
+
+    insertChunk(chunk) {
+      if (!chunk) return false;
+      if (chunk.length === 1) {
+        return this.insertChar(chunk);
+      }
+      const chars = Array.from(chunk);
+      for (const ch of chars) {
+        this.insertChar(ch);
+      }
+      return true;
     },
 
     splitIntoParagraphs(text) {
@@ -269,7 +304,8 @@
 
     async typeParagraphs(rawText, options = {}) {
       const {
-        paragraphDelayMs = 280,
+        charDelayMs = 6,
+        paragraphDelayMs = 240,
         onProgress,
         onComplete,
         onCancel,
@@ -329,13 +365,22 @@
 
           const line = lines[l].trim();
           if (line) {
-            // Insert line as clean atomic chunk to prevent character dropping
-            this.insertChunk(line);
+            const chars = Array.from(line);
+            for (let c = 0; c < chars.length; c++) {
+              if (this.abortRequested) break;
+              this.insertChar(chars[c]);
+
+              if (charDelayMs > 0) {
+                await new Promise((res) => setTimeout(res, charDelayMs));
+              } else if (c % 25 === 0) {
+                await new Promise((res) => setTimeout(res, 0));
+              }
+            }
           }
 
           if (l < lines.length - 1) {
             this.insertNewline();
-            await new Promise((res) => setTimeout(res, 30));
+            await new Promise((res) => setTimeout(res, Math.max(25, charDelayMs * 3)));
           }
         }
 
@@ -368,19 +413,24 @@
 
     instantInsert(rawText, options = {}) {
       return this.typeParagraphs(rawText, {
+        charDelayMs: 0,
         paragraphDelayMs: 0,
         ...options
       });
     },
 
     async typeStream(text, options = {}) {
-      const { speedMs, paragraphDelayMs, ...rest } = options;
-      const delay = paragraphDelayMs !== undefined
+      const { speedMs, paragraphDelayMs, charDelayMs, ...rest } = options;
+      const cDelay = charDelayMs !== undefined
+        ? charDelayMs
+        : (speedMs ? Math.max(3, parseInt(speedMs, 10)) : 6);
+      const pDelay = paragraphDelayMs !== undefined
         ? paragraphDelayMs
-        : (speedMs ? Math.max(100, speedMs * 15) : 250);
+        : (cDelay ? Math.max(120, cDelay * 25) : 240);
 
       return this.typeParagraphs(text, {
-        paragraphDelayMs: delay,
+        charDelayMs: cDelay,
+        paragraphDelayMs: pDelay,
         ...rest
       });
     },

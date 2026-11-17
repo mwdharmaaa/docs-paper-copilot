@@ -295,7 +295,8 @@
     if (window.AutoTyper) {
       setTimeout(() => {
         window.AutoTyper.typeParagraphs(cleanContent, {
-          paragraphDelayMs: 250,
+          charDelayMs: 6,
+          paragraphDelayMs: 220,
           onProgress: (p) => {
             statusEl.innerHTML = `<span class="gemini-pulse-dot"></span> Mengetik paragraf ${p.paragraphIndex} dari ${p.totalParagraphs} (${p.percent}%)...`;
           },
