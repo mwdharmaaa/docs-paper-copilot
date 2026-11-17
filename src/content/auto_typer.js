@@ -424,8 +424,13 @@
     },
 
     insertNewline(target = null, iframe = null) {
-      const tgt = target || this.getEditorTarget();
-      const ifr = iframe || this.getEditorIframe();
+      let tgt = target;
+      let ifr = iframe;
+      if (!tgt || !tgt.isConnected) {
+        this.focusEditor();
+        tgt = this.getEditorTarget();
+        ifr = this.getEditorIframe();
+      }
       if (!tgt) return false;
 
       try {
@@ -488,84 +493,17 @@
     },
 
     /**
-     * Memasukkan potongan teks/paragraf ke Google Docs secara atomik.
-     * Mencegah teks terpotong di tengah jalan saat terjadi perpindahan halaman (pagination).
-     */
-    insertTextChunk(chunk, target = null, iframe = null) {
-      if (!chunk || typeof chunk !== "string") return true;
-
-      const tgt = target || this.getEditorTarget();
-      const ifr = iframe || this.getEditorIframe();
-      if (!tgt) return false;
-
-      let inserted = false;
-
-      // 1. Eksekusi insertText via contentDocument iframe Google Docs
-      if (ifr && ifr.contentDocument) {
-        try {
-          inserted = ifr.contentDocument.execCommand("insertText", false, chunk);
-        } catch {}
-      }
-
-      // 2. Dispatch event input (beforeinput & input)
-      try {
-        tgt.dispatchEvent(new InputEvent("beforeinput", {
-          inputType: "insertText",
-          data: chunk,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-
-        if (!inserted && ifr && ifr.contentDocument) {
-          try {
-            inserted = ifr.contentDocument.execCommand("insertText", false, chunk);
-          } catch {}
-        }
-
-        tgt.dispatchEvent(new InputEvent("input", {
-          inputType: "insertText",
-          data: chunk,
-          bubbles: true,
-          cancelable: false,
-          composed: true
-        }));
-      } catch {}
-
-      // 3. Fallback: ClipboardEvent DataTransfer paste jika execCommand gagal
-      if (!inserted) {
-        try {
-          const dt = new DataTransfer();
-          dt.setData("text/plain", chunk);
-          tgt.dispatchEvent(new ClipboardEvent("paste", {
-            clipboardData: dt,
-            bubbles: true,
-            cancelable: true,
-            composed: true
-          }));
-          inserted = true;
-        } catch {}
-      }
-
-      // 4. Secondary fallback: loop karakter jika cara atomik di atas belum terproses
-      if (!inserted) {
-        const chars = Array.from(chunk);
-        for (let i = 0; i < chars.length; i++) {
-          this.insertChar(chars[i], tgt, ifr);
-        }
-        inserted = true;
-      }
-
-      return inserted;
-    },
-
-    /**
      * Memasukkan Indentasi 1x Tab Resmi Skripsi (Visible First-Line Indent).
      * Menggunakan sequence 7 non-breaking spaces (\u00A0) dan event Tab (~1.27 cm).
      */
     insertTab(target = null, iframe = null) {
-      const tgt = target || this.getEditorTarget();
-      const ifr = iframe || this.getEditorIframe();
+      let tgt = target;
+      let ifr = iframe;
+      if (!tgt || !tgt.isConnected) {
+        this.focusEditor();
+        tgt = this.getEditorTarget();
+        ifr = this.getEditorIframe();
+      }
       if (!tgt) return false;
 
       try {
@@ -581,7 +519,9 @@
       } catch {}
 
       const tabSpaces = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0";
-      this.insertTextChunk(tabSpaces, tgt, ifr);
+      for (let i = 0; i < tabSpaces.length; i++) {
+        this.insertChar(tabSpaces[i], tgt, ifr);
+      }
 
       try {
         tgt.dispatchEvent(new KeyboardEvent("keyup", {
@@ -595,6 +535,38 @@
         }));
       } catch {}
 
+      return true;
+    },
+
+    /**
+     * Mengetikkan teks secara cepat dan andal ke Google Docs menggunakan event keyboard asli.
+     * Dilengkapi deteksi koneksi DOM otomatis (isConnected) dan pemulihan fokus
+     * agar tidak pernah terhenti atau terpotong saat terjadi page break / pagination!
+     */
+    async typeText(text, target = null, iframe = null) {
+      if (!text || typeof text !== "string") return true;
+
+      const chars = Array.from(text);
+      for (let c = 0; c < chars.length; c++) {
+        if (this.abortRequested) break;
+
+        // Pastikan target masih terhubung ke DOM kanvas Docs
+        let tgt = target;
+        let ifr = iframe;
+        if (!tgt || !tgt.isConnected) {
+          this.focusEditor();
+          tgt = this.getEditorTarget();
+          ifr = this.getEditorIframe();
+        }
+
+        this.insertChar(chars[c], tgt, ifr);
+
+        // Jeda sangat singkat (2 ms) setiap 35 karakter agar thread render Google Docs
+        // dapat memproses event tanpa drop event dan tanpa lag
+        if (c > 0 && c % 35 === 0) {
+          await new Promise((res) => setTimeout(res, 2));
+        }
+      }
       return true;
     },
 
@@ -896,7 +868,8 @@
               this.setBold(true, target, iframe);
             }
 
-            this.insertTextChunk(hInfo.text, target, iframe);
+            // Ketik teks judul ke Google Docs
+            await this.typeText(hInfo.text, target, iframe);
 
             if (l < lines.length - 1 || i < total - 1) {
               this.insertNewline(target, iframe);
@@ -923,7 +896,7 @@
             }
 
             const cleanTocText = rawLine.replace(/^\[(?:JUDUL_\d|H\d)\]\s*/i, "");
-            this.insertTextChunk(cleanTocText, target, iframe);
+            await this.typeText(cleanTocText, target, iframe);
 
             if (l < lines.length - 1) {
               this.insertNewline(target, iframe);
@@ -953,9 +926,8 @@
               this.insertTab(target, iframe);
             }
 
-            // Masukkan teks paragraf secara atomik/chunk
-            // Ini membuat pengetikan sangat cepat, tanpa risiko terpotong di tengah jalan!
-            this.insertTextChunk(textToType, target, iframe);
+            // Ketik teks alinea menggunakan sequence event keyboard asli Docs
+            await this.typeText(textToType, target, iframe);
 
             if (l < lines.length - 1) {
               this.insertNewline(target, iframe);
