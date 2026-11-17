@@ -37,7 +37,12 @@
   * **Sistem State-Guarded Controller (`currentFontSize`)**: `AutoTyper` menyimpan state ukuran aktif di memori. Jika elemen berikutnya membutuhkan ukuran font yang sama (misal teks alinea isi 12 pt setelah sub-judul 12 pt), sistem langsung melakukan *no-op* (zero-action) tanpa memicu klik tombol atau event berulang, mencegah akumulasi font size yang melesat ke 19 pt / 20 pt.
   * **Auto-Kalibrasi Awal ke 12 pt (`calibrateTo12`)**: Pada awal setiap pengetikan draf naskah, sistem membaca ukuran font aktif dokumen dan langsung menyelaraskannya ke standar baku 12 pt menggunakan input langsung `#fontSizeInputElement` dan tombol stepper `#fontSizeDecrement`/`#fontSizeIncrement`.
   * **Isolasi Delta Ukuran Judul**: Judul Utama (16 pt) dan Judul Bab (14 pt) diubah secara presisi hanya untuk satu baris judul bersangkutan, lalu baris kosong berikutnya secara instan dikembalikan ke standar teks isi 12 pt, unbold, dan Justified.
-  * **Jarak Vertikal Standar**: Jarak vertikal antar-elemen (Bab ke Subbab, Subbab ke Alinea, Alinea ke Alinea) diatur tepat 1x baris baru (single newline) agar dokumen rapi dan elegan layaknya skripsi asli.
+  * **Pemisahan Judul & Teks (Wajib Baris Kosong Pemisah, Dilarang Menyatu)**:
+    * Antara Judul Utama Dokumen dan Judul Bab (BAB 1) WAJIB dipisahkan oleh 1 baris kosong pemisah (double Enter). Judul utama dan judul bab TIDAK BOLEH MENYATU!
+    * Antara Judul Bab (BAB 1) dan Sub-bab (1.1) WAJIB dipisahkan oleh 1 baris kosong pemisah (double Enter). Judul bab dan sub-bab TIDAK BOLEH MENYATU!
+    * Antara Sub-bab (1.1) dan alinea teks isi dokumen WAJIB dipisahkan oleh 1 baris kosong pemisah (double Enter). Sub-bab dan alinea isi TIDAK BOLEH MENYATU!
+    * Antara alinea teks sebelumnya dan judul baru berikutnya WAJIB dipisahkan oleh 1 baris kosong pemisah.
+  * **Mekanisme Anti-Double-Toggle Bold**: `setBold` memeriksa status nyata toolbar terlebih dahulu dan mengeksekusi tepat satu aksi agar bold tidak membatalkan dirinya sendiri (on lalu off).
 
 ---
 

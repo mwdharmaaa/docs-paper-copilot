@@ -61,7 +61,11 @@ STANDAR FORMAT & ARSITEKTUR DOKUMEN AKADEMIK (MUTLAK DIPATUHI):
      * Sub-bab: Penomoran desimal resmi dua digit, Title Case (contoh: 1.1 Latar Belakang Masalah, 1.2 Rumusan Masalah).
      * Sub-subbab: Tiga digit desimal, Title Case (contoh: 1.1.1 Identifikasi Isu Strategis).
    - DILARANG KERAS mengeluarkan tag mesin seperti [JUDUL_1], [JUDUL_2], [JUDUL_DOKUMEN], atau simbol Markdown (#, ##, ###).
-   - Antara Bab, Subbab, dan Paragraf cukup satu kali baris baru normal. Dilarang membuat baris kosong ganda yang membuat dokumen tampak berantakan.
+   - ATURAN PEMISAHAN JUDUL & TEKS (WAJIB BARIS KOSONG PEMISAH, DILARANG MENYATU):
+     * Antara Judul Utama Dokumen dan Judul Bab (BAB 1) WAJIB dipisahkan oleh 1 baris kosong pemisah (double newline). Judul utama dan judul bab TIDAK BOLEH MENYATU!
+     * Antara Judul Bab (BAB 1) dan Sub-bab (1.1) WAJIB dipisahkan oleh 1 baris kosong pemisah. Judul bab dan sub-bab TIDAK BOLEH MENYATU!
+     * Antara Sub-bab (1.1) dan teks alinea paragraf isi WAJIB dipisahkan oleh 1 baris kosong pemisah. Sub-bab dan teks isi TIDAK BOLEH MENYATU!
+     * Antara paragraf sebelumnya dan judul baru berikutnya WAJIB dipisahkan oleh 1 baris kosong pemisah.
 
 4. STRUKTUR BAB 1 PENDAHULUAN BERSTANDAR AKADEMIK TINGGI (S1/S2):
    - 1.1 Latar Belakang Masalah:

@@ -84,6 +84,10 @@
       if (draftMatch) {
         s = draftMatch[1];
       } else {
+        const openMatch = s.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+        if (openMatch) {
+          s = s.substring(openMatch.index + openMatch[0].length);
+        }
         const closeMatch = s.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
         if (closeMatch) {
           s = s.substring(0, closeMatch.index);
@@ -136,68 +140,88 @@
     },
 
     /**
-     * Mengatur status tebal huruf (Bold / Unbold).
+     * Memeriksa status tebal (Bold) aktual dari toolbar Google Docs.
      */
-    setBold(shouldBeBold, target = null, iframe = null) {
+    isBoldActive() {
+      try {
+        const boldBtn = document.getElementById("boldButton") ||
+                        document.querySelector("#boldButton, [aria-label*='Tebal'], [aria-label*='Bold']");
+        if (boldBtn) {
+          const ariaPressed = boldBtn.getAttribute("aria-pressed");
+          const ariaChecked = boldBtn.getAttribute("aria-checked");
+          if (ariaPressed !== null) return ariaPressed === "true";
+          if (ariaChecked !== null) return ariaChecked === "true";
+          return boldBtn.classList.contains("goog-toolbar-button-checked") ||
+                 boldBtn.classList.contains("docs-material-button-checked");
+        }
+      } catch {}
+      return false;
+    },
+
+    /**
+     * Mengatur status tebal huruf (Bold / Unbold).
+     * Mencegah pembatalan ganda (anti-double-toggle):
+     * Memeriksa status nyata toolbar Docs terlebih dahulu,
+     * hanya mengeksekusi tepat satu aksi (klik tombol toolbar atau Ctrl+B fallback),
+     * dan tidak pernah memicu keduanya sekaligus yang menyebabkan bold batal (on lalu off).
+     */
+    async setBold(shouldBeBold, target = null, iframe = null) {
       try {
         const targetBool = Boolean(shouldBeBold);
-        if (this.currentBold === targetBool) {
-          return;
-        }
-
         const boldBtn = document.getElementById("boldButton") ||
-                        document.querySelector(".docs-material-button[id*='bold']") ||
-                        document.querySelector("[aria-label*='Tebal']") ||
-                        document.querySelector("[aria-label*='Bold']");
+                        document.querySelector("#boldButton, [aria-label*='Tebal (Ctrl+B)'], [aria-label*='Bold (Ctrl+B)'], [aria-label*='Tebal'], [aria-label*='Bold']");
 
-        const ifr = iframe || this.getEditorIframe();
-        let isBold = false;
-
-        if (ifr && ifr.contentDocument && ifr.contentDocument.queryCommandState) {
-          try {
-            isBold = Boolean(ifr.contentDocument.queryCommandState("bold"));
-          } catch {}
+        const current = this.isBoldActive();
+        if (current === targetBool) {
+          this.currentBold = targetBool;
+          return targetBool;
         }
 
-        if (!isBold && boldBtn) {
-          isBold = boldBtn.getAttribute("aria-pressed") === "true" ||
-                   boldBtn.getAttribute("aria-checked") === "true" ||
-                   boldBtn.classList.contains("goog-toolbar-button-checked") ||
-                   boldBtn.classList.contains("docs-material-button-checked");
-        }
+        // Jalankan HANYA SATU metode toggle untuk mencegah pembatalan ganda (anti-double-toggle)!
+        let toggled = false;
+        if (boldBtn) {
+          // Klik tombol toolbar Bold menggunakan urutan pointer/mouse yang bersih
+          const opts = { bubbles: true, cancelable: true, view: window };
+          boldBtn.dispatchEvent(new MouseEvent("mousedown", opts));
+          boldBtn.dispatchEvent(new MouseEvent("mouseup", opts));
+          boldBtn.dispatchEvent(new MouseEvent("click", opts));
 
-        if (isBold !== targetBool) {
-          if (boldBtn) {
-            this.clickElement(boldBtn);
+          // Verifikasi apakah state toolbar sudah berubah sesuai target
+          if (this.isBoldActive() === targetBool) {
+            toggled = true;
           }
+        }
 
+        // Fallback: HANYA jika tombol toolbar tidak merespons, dispatch Ctrl+B satu kali
+        if (!toggled) {
           const tgt = target || this.getEditorTarget();
           if (tgt) {
-            try {
-              tgt.dispatchEvent(new KeyboardEvent("keydown", {
-                key: "b",
-                code: "KeyB",
-                keyCode: 66,
-                which: 66,
-                ctrlKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-              }));
-              tgt.dispatchEvent(new KeyboardEvent("keyup", {
-                key: "b",
-                code: "KeyB",
-                keyCode: 66,
-                which: 66,
-                ctrlKey: true,
-                bubbles: true,
-                cancelable: true,
-                composed: true
-              }));
-            } catch {}
+            tgt.dispatchEvent(new KeyboardEvent("keydown", {
+              key: "b",
+              code: "KeyB",
+              keyCode: 66,
+              which: 66,
+              ctrlKey: true,
+              bubbles: true,
+              cancelable: true,
+              composed: true
+            }));
+            tgt.dispatchEvent(new KeyboardEvent("keyup", {
+              key: "b",
+              code: "KeyB",
+              keyCode: 66,
+              which: 66,
+              ctrlKey: true,
+              bubbles: true,
+              cancelable: true,
+              composed: true
+            }));
           }
         }
+
         this.currentBold = targetBool;
+        this.focusEditor();
+        return targetBool;
       } catch (err) {
         console.warn("[AutoTyper] setBold error:", err);
       }
@@ -443,7 +467,7 @@
       this.currentFontSize = actual;
       await this.changeFontSize(12, target, iframe);
       this.currentFontSize = 12;
-      this.setBold(false, target, iframe);
+      await this.setBold(false, target, iframe);
       this.applyAlignment("justify", target, iframe);
       return 12;
     },
@@ -922,7 +946,7 @@
       }
 
       // Judul Dokumen Utama: Baris huruf kapital semua tanpa titik di akhir, panjang >= 15 karakter
-      if (/^[A-Z0-9\s,:()\-]{15,}$/.test(trimmed) && !/[a-z]/.test(trimmed) && !/\.\s*$/.test(trimmed)) {
+      if (/^[A-Z0-9\s,:()\-'"\/]{15,}$/.test(trimmed) && !/[a-z]/.test(trimmed) && !/\.\s*$/.test(trimmed)) {
         return true;
       }
 
@@ -1020,7 +1044,7 @@
       if (
         isExplicitDocTitle ||
         (/^BAB\s+/i.test(text) === false &&
-         /^[A-Z0-9\s,:()\-]{15,}$/.test(text) &&
+         /^[A-Z0-9\s,:()\-'"\/]{15,}$/.test(text) &&
          !/[a-z]/.test(text) &&
          !/\.\s*$/.test(text))
       ) {
@@ -1141,24 +1165,29 @@
         if (hInfo.isHeading && !isTocLine) {
           // ========================================================
           // EKSEKUSI FORMAT JUDUL (HEADINGS):
-          // - Judul Dokumen Utama: 16 pt, BOLD, Center
-          // - Judul Bab (BAB 1 / KATA PENGANTAR): 14 pt, BOLD, Center
-          // - Sub-judul (1.1): 12 pt, BOLD, Left
-          // - Sub-sub-judul (1.1.1): 12 pt, BOLD, Left
+          // - Judul Dokumen Utama: 16 pt, BOLD, Center + 1 BARIS KOSONG PEMISAH
+          // - Judul Bab (BAB 1 / KATA PENGANTAR): 14 pt, BOLD, Center + 1 BARIS KOSONG PEMISAH
+          // - Sub-judul (1.1): 12 pt, BOLD, Left + 1 BARIS KOSONG PEMISAH
+          // - Sub-sub-judul (1.1.1): 12 pt, BOLD, Left + 1 BARIS KOSONG PEMISAH
+          // ATURAN MUTLAK: DILARANG MENYATU DENGAN TEKS DI SEKITARNYA!
           // ========================================================
           await this.changeFontSize(hInfo.fontSize, target, iframe);
-          this.setBold(true, target, iframe);
+          await this.setBold(true, target, iframe);
           this.applyAlignment(hInfo.align || "center", target, iframe);
 
           // Ketik teks judul ke Google Docs
           await this.typeText(hInfo.text, target, iframe);
 
-          // Baris baru setelah judul
+          // Selesaikan baris judul (Enter 1)
+          this.insertNewline(target, iframe);
+
+          // WAJIB: Masukkan 1 baris kosong pemisah (Enter 2)
+          // Menjamin Judul Utama, Judul Bab, dan Sub-bab TIDAK PERNAH MENYATU dengan teks di bawahnya!
           this.insertNewline(target, iframe);
 
           // Kembalikan ke standar teks isi (12 pt, unbold, Justified)
           await this.changeFontSize(12, target, iframe);
-          this.setBold(false, target, iframe);
+          await this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
         } else if (isTocLine) {
           // ========================================================
@@ -1169,11 +1198,11 @@
           const isTocHeader = /^DAFTAR\s+ISI/i.test(block);
           if (isTocHeader) {
             await this.changeFontSize(14, target, iframe);
-            this.setBold(true, target, iframe);
+            await this.setBold(true, target, iframe);
             this.applyAlignment("center", target, iframe);
           } else {
             await this.changeFontSize(12, target, iframe);
-            this.setBold(false, target, iframe);
+            await this.setBold(false, target, iframe);
             this.applyAlignment("left", target, iframe);
           }
 
@@ -1181,10 +1210,13 @@
           await this.typeText(cleanTocText, target, iframe);
 
           this.insertNewline(target, iframe);
+          if (isTocHeader) {
+            this.insertNewline(target, iframe);
+          }
 
           // Kembalikan ke standar teks isi jika selesai baris TOC
           await this.changeFontSize(12, target, iframe);
-          this.setBold(false, target, iframe);
+          await this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
         } else {
           // ========================================================
@@ -1195,7 +1227,7 @@
           // - Indentasi: WAJIB 1x TAB (~1.27 cm) di awal kalimat pertama
           // ========================================================
           await this.changeFontSize(12, target, iframe);
-          this.setBold(false, target, iframe);
+          await this.setBold(false, target, iframe);
           this.applyAlignment("justify", target, iframe);
 
           const isList = /^[-*•]\s+/.test(block) || /^\d+\.\s+/.test(block);
@@ -1214,6 +1246,16 @@
           await this.typeText(textToType, target, iframe);
 
           this.insertNewline(target, iframe);
+
+          // Jika blok berikutnya adalah Judul Baru (Bab atau Sub-bab baru):
+          // Tambahkan 1 baris kosong pemisah agar judul baru TIDAK PERNAH MENYATU dengan teks paragraf sebelumnya!
+          if (i + 1 < total) {
+            const nextBlock = paragraphs[i + 1].trim();
+            const nextHInfo = this.parseLineHeading(nextBlock);
+            if (nextHInfo.isHeading && !this.isTableOfContentsLine(nextBlock)) {
+              this.insertNewline(target, iframe);
+            }
+          }
         }
 
         const percent = Math.round(((i + 1) / total) * 100);
