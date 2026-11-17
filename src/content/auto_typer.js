@@ -19,7 +19,10 @@
 (function initAutoTyper() {
   const AutoTyper = {
     isTyping: false,
+    isPaused: false,
+    pauseRequested: false,
     abortRequested: false,
+    currentDraftContext: null,
     currentFontSize: null,
     currentBold: null,
     currentAlign: null,
@@ -796,86 +799,26 @@
     },
 
     /**
-     * Memasukkan satu kesatuan string / teks langsung secara instan (0 ms, Langsung Jadi).
-     * Mengeksekusi event beforeinput, execCommand, dan Simulated Paste dengan payload penuh
-     * sehingga seluruh alinea atau judul langsung jadi tanpa pengetikan per beberapa kata.
-     */
-    insertChunk(str, target = null, iframe = null) {
-      if (!str || typeof str !== "string") return true;
-
-      let tgt = target || this.getEditorTarget();
-      let ifr = iframe || this.getEditorIframe();
-      if (!tgt) return false;
-
-      try {
-        // 1. Dispatch beforeinput dengan payload string penuh
-        tgt.dispatchEvent(new InputEvent("beforeinput", {
-          inputType: "insertText",
-          data: str,
-          bubbles: true,
-          cancelable: true,
-          composed: true
-        }));
-
-        // 2. Eksekusi execCommand insertText pada editor iframe
-        let inserted = false;
-        if (ifr && ifr.contentDocument) {
-          try {
-            inserted = Boolean(ifr.contentDocument.execCommand("insertText", false, str));
-          } catch {}
-        }
-
-        // 3. Fallback: Simulated Paste dengan DataTransfer jika execCommand tidak merespons
-        if (!inserted) {
-          try {
-            const dt = new DataTransfer();
-            dt.setData("text/plain", str);
-            const pasteEvt = new ClipboardEvent("paste", {
-              clipboardData: dt,
-              bubbles: true,
-              cancelable: true,
-              composed: true
-            });
-            tgt.dispatchEvent(pasteEvt);
-            inserted = true;
-          } catch {}
-        }
-
-        // 4. Dispatch input event dengan payload string penuh
-        tgt.dispatchEvent(new InputEvent("input", {
-          inputType: "insertText",
-          data: str,
-          bubbles: true,
-          cancelable: false,
-          composed: true
-        }));
-
-        return inserted;
-      } catch (err) {
-        console.warn("[AutoTyper] insertChunk error:", err);
-        return false;
-      }
-    },
-
-    /**
      * Mengetikkan teks secara instan ke Google Docs (Langsung Jadi).
-     * Memasukkan seluruh string sekaligus tanpa pengetikan per karakter / per beberapa kata.
+     * Memancarkan seluruh sequence keyboard asli Docs (keydown, keypress, beforeinput, input, keyup)
+     * secara synchronous murni tanpa per-character setTimeout sehingga seluruh alinea
+     * muncul secara instan dalam 1 render frame.
      */
     async typeText(text, target = null, iframe = null) {
       if (!text || typeof text !== "string") return true;
 
-      // Prioritas 1: Langsung masukkan seluruh blok teks sekaligus (Instant Execution, 0 ms)
-      const success = this.insertChunk(text, target, iframe);
-      if (success) {
-        return true;
+      let tgt = target;
+      let ifr = iframe;
+      if (!tgt || !tgt.isConnected) {
+        this.focusEditor();
+        tgt = this.getEditorTarget();
+        ifr = this.getEditorIframe();
       }
 
-      // Prioritas 2 (Ultra-fast fallback): Jika browser membutuhkan per-karakter, ketik tanpa jeda
       const chars = Array.from(text);
-      for (let c = 0; c < chars.length; c++) {
+      const len = chars.length;
+      for (let c = 0; c < len; c++) {
         if (this.abortRequested) break;
-        let tgt = target || this.getEditorTarget();
-        let ifr = iframe || this.getEditorIframe();
         this.insertChar(chars[c], tgt, ifr);
       }
       return true;
@@ -1139,19 +1082,14 @@
      * - Resilient terhadap batas halaman (anti-cutoff)
      */
     async typeDraft(rawText, options = {}) {
-      const {
-        onProgress,
-        onComplete,
-        onCancel,
-        onError
-      } = options;
-
       if (!rawText || rawText.length === 0) {
-        if (onComplete) onComplete();
+        if (options.onComplete) options.onComplete();
         return true;
       }
 
       this.isTyping = true;
+      this.isPaused = false;
+      this.pauseRequested = false;
       this.abortRequested = false;
 
       if (document.activeElement && typeof document.activeElement.blur === "function") {
@@ -1159,14 +1097,14 @@
       }
 
       this.focusEditor();
-      await new Promise((res) => setTimeout(res, 40));
+      await new Promise((res) => setTimeout(res, 30));
       this.focusEditor();
 
       let target = this.getEditorTarget();
       let iframe = this.getEditorIframe();
       if (!target) {
         this.isTyping = false;
-        if (onError) onError("Target editor Google Docs tidak ditemukan.");
+        if (options.onError) options.onError("Target editor Google Docs tidak ditemukan.");
         return false;
       }
 
@@ -1176,20 +1114,64 @@
 
       if (total === 0) {
         this.isTyping = false;
-        if (onComplete) onComplete();
+        if (options.onComplete) options.onComplete();
         return true;
       }
 
       // Standarisasi awal naskah: Kalibrasi ke 12pt, unbold, dan Rata Kanan-Kiri (Justify)
       await this.calibrateTo12(target, iframe);
 
-      let inTocBlock = false;
+      // Inisialisasi konteks pengetikan draf untuk mendukung jeda & lanjutkan (pause/resume)
+      this.currentDraftContext = {
+        paragraphs,
+        currentIndex: 0,
+        inTocBlock: false,
+        options
+      };
 
-      for (let i = 0; i < total; i++) {
+      return this.runDraftLoop(this.currentDraftContext);
+    },
+
+    /**
+     * Loop pengetikan alinea yang dapat dijeda (pause) dan dilanjutkan (resume) secara mulus.
+     */
+    async runDraftLoop(ctx) {
+      if (!ctx || !Array.isArray(ctx.paragraphs)) return false;
+
+      const paragraphs = ctx.paragraphs;
+      const total = paragraphs.length;
+      const options = ctx.options || {};
+      const { onProgress, onComplete, onPause, onCancel, onError } = options;
+
+      let target = this.getEditorTarget();
+      let iframe = this.getEditorIframe();
+
+      for (let i = ctx.currentIndex; i < total; i++) {
+        // 1. Cek pembatalan total
         if (this.abortRequested) {
           this.isTyping = false;
+          this.isPaused = false;
           this.abortRequested = false;
+          this.currentDraftContext = null;
           if (onCancel) onCancel();
+          return false;
+        }
+
+        // 2. Cek permintaan jeda pengetikan (Pause)
+        if (this.pauseRequested) {
+          this.isPaused = true;
+          this.pauseRequested = false;
+          ctx.currentIndex = i; // simpan alinea yang belum diketik
+          const percent = Math.round((i / total) * 100);
+          if (onPause) {
+            onPause({
+              current: i,
+              total,
+              percent,
+              paragraphIndex: i,
+              totalParagraphs: total
+            });
+          }
           return false;
         }
 
@@ -1201,20 +1183,23 @@
         iframe = this.getEditorIframe();
 
         const block = paragraphs[i].trim();
-        if (!block) continue;
+        if (!block) {
+          ctx.currentIndex = i + 1;
+          continue;
+        }
 
         // Tutup jika ada popup spellcheck yang muncul
         this.dismissSpellPopup();
 
         // Deteksi status blok Daftar Isi
         if (/^DAFTAR\s+ISI/i.test(block)) {
-          inTocBlock = true;
-        } else if (inTocBlock && /^BAB\s+(?:[IVXLCDM]+|\d+)/i.test(block)) {
-          inTocBlock = false;
+          ctx.inTocBlock = true;
+        } else if (ctx.inTocBlock && /^BAB\s+(?:[IVXLCDM]+|\d+)/i.test(block)) {
+          ctx.inTocBlock = false;
         }
 
         const hInfo = this.parseLineHeading(block);
-        const isTocLine = inTocBlock || this.isTableOfContentsLine(block);
+        const isTocLine = ctx.inTocBlock || this.isTableOfContentsLine(block);
 
         if (hInfo.isHeading && !isTocLine) {
           // ========================================================
@@ -1312,6 +1297,7 @@
           }
         }
 
+        ctx.currentIndex = i + 1;
         const percent = Math.round(((i + 1) / total) * 100);
         if (onProgress) {
           onProgress({
@@ -1323,13 +1309,59 @@
           });
         }
 
-        // Jeda mikro (0 ms) hanya untuk yielding event loop agar update tampilan instan dan secepat kilat
-        await new Promise((res) => setTimeout(res, 0));
+        // Jeda sangat singkat (15 ms) antar alinea agar Google Docs mereflow layout
+        // dan event loop browser dapat menangkap interaksi klik jeda (pause) pengguna
+        await new Promise((res) => setTimeout(res, 15));
       }
 
       this.isTyping = false;
+      this.isPaused = false;
+      this.pauseRequested = false;
+      this.currentDraftContext = null;
       if (onComplete) onComplete();
       return true;
+    },
+
+    /**
+     * Hentikan sementara (Pause) pengetikan draf.
+     */
+    pause() {
+      if (this.isTyping && !this.isPaused) {
+        this.pauseRequested = true;
+        return true;
+      }
+      return false;
+    },
+
+    /**
+     * Lanjutkan kembali (Resume) pengetikan draf dari posisi terakhir.
+     */
+    resume() {
+      if (this.isTyping && this.isPaused && this.currentDraftContext) {
+        this.isPaused = false;
+        this.pauseRequested = false;
+        const ctx = this.currentDraftContext;
+        if (ctx.options && typeof ctx.options.onResume === "function") {
+          const total = ctx.paragraphs.length;
+          const pct = total > 0 ? Math.round((ctx.currentIndex / total) * 100) : 0;
+          ctx.options.onResume({ percent: pct });
+        }
+        this.focusEditor();
+        return this.runDraftLoop(ctx);
+      }
+      return false;
+    },
+
+    /**
+     * Navigasi Satu Tombol: Bergantian Hentikan / Lanjutkan Pengetikan.
+     */
+    togglePauseResume() {
+      if (!this.isTyping) return false;
+      if (this.isPaused) {
+        return this.resume();
+      } else {
+        return this.pause();
+      }
     },
 
     async typeParagraphs(rawText, options = {}) {
@@ -1347,6 +1379,13 @@
     stop() {
       if (this.isTyping) {
         this.abortRequested = true;
+        this.isTyping = false;
+        this.isPaused = false;
+        this.pauseRequested = false;
+        if (this.currentDraftContext && this.currentDraftContext.options?.onCancel) {
+          this.currentDraftContext.options.onCancel();
+        }
+        this.currentDraftContext = null;
       }
     }
   };

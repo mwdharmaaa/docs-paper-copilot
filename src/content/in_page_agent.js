@@ -183,7 +183,11 @@
         <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
       </svg>
       <span class="gemini-dock-title">Gemini</span>
-      <span id="gemini-dock-status" class="gemini-dock-status-text">Memasukkan draf...</span>
+      <span id="gemini-dock-status" class="gemini-dock-status-text"></span>
+      <button type="button" id="gemini-dock-control-btn" class="gemini-dock-action-btn" style="display: none;" title="Hentikan / Lanjutkan Pengetikan">
+        <span id="gemini-dock-control-icon">⏸</span>
+        <span id="gemini-dock-control-label">Hentikan</span>
+      </button>
       <span class="gemini-dock-shortcut">Alt+G</span>
     </div>
 
@@ -214,6 +218,10 @@
           <div class="gemini-header-center">
             <span id="gemini-doc-meta-title" class="gemini-doc-meta-title">Dokumen Google Docs</span>
             <span id="gemini-page-format-chip" class="gemini-page-format-chip">Arial 12pt • Justify</span>
+            <button type="button" id="gemini-window-control-btn" class="gemini-window-control-btn" style="display: none;" title="Hentikan / Lanjutkan Pengetikan">
+              <span id="gemini-window-control-icon">⏸</span>
+              <span id="gemini-window-control-label">Hentikan</span>
+            </button>
           </div>
 
           <div class="gemini-header-right">
@@ -374,6 +382,14 @@
   const btnClearChat = document.getElementById("gemini-clear-chat");
   const historyList = document.getElementById("gemini-history-list");
 
+  const dockControlBtn = document.getElementById("gemini-dock-control-btn");
+  const dockControlIcon = document.getElementById("gemini-dock-control-icon");
+  const dockControlLabel = document.getElementById("gemini-dock-control-label");
+
+  const windowControlBtn = document.getElementById("gemini-window-control-btn");
+  const windowControlIcon = document.getElementById("gemini-window-control-icon");
+  const windowControlLabel = document.getElementById("gemini-window-control-label");
+
   const chatScroll = document.getElementById("gemini-chat-scroll");
   const welcomeContainer = document.getElementById("gemini-welcome-container");
   const messagesList = document.getElementById("gemini-messages-list");
@@ -448,6 +464,51 @@
     sidebar.classList.toggle("collapsed");
   };
 
+  // ==========================================================================
+  // Unified Navigation: Pause / Resume Typing Controller
+  // ==========================================================================
+  function updatePauseResumeUI(isPaused) {
+    if (dockControlBtn) {
+      if (isPaused) {
+        dockControlBtn.classList.add("paused");
+        if (dockControlIcon) dockControlIcon.textContent = "▶";
+        if (dockControlLabel) dockControlLabel.textContent = "Lanjutkan";
+        dockControlBtn.title = "Lanjutkan pengetikan draf ke Google Docs";
+      } else {
+        dockControlBtn.classList.remove("paused");
+        if (dockControlIcon) dockControlIcon.textContent = "⏸";
+        if (dockControlLabel) dockControlLabel.textContent = "Hentikan";
+        dockControlBtn.title = "Hentikan sementara pengetikan draf";
+      }
+    }
+    if (windowControlBtn) {
+      if (isPaused) {
+        windowControlBtn.classList.add("paused");
+        if (windowControlIcon) windowControlIcon.textContent = "▶";
+        if (windowControlLabel) windowControlLabel.textContent = "Lanjutkan";
+        windowControlBtn.title = "Lanjutkan pengetikan draf ke Google Docs";
+      } else {
+        windowControlBtn.classList.remove("paused");
+        if (windowControlIcon) windowControlIcon.textContent = "⏸";
+        if (windowControlLabel) windowControlLabel.textContent = "Hentikan";
+        windowControlBtn.title = "Hentikan sementara pengetikan draf";
+      }
+    }
+  }
+
+  function handleTogglePauseResume(e) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (window.AutoTyper && typeof window.AutoTyper.togglePauseResume === "function") {
+      window.AutoTyper.togglePauseResume();
+    }
+  }
+
+  if (dockControlBtn) dockControlBtn.onclick = handleTogglePauseResume;
+  if (windowControlBtn) windowControlBtn.onclick = handleTogglePauseResume;
+
   // Global Shortcuts: Alt+G to toggle, Escape to close
   window.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "g" || e.key === "G" || e.key === "k" || e.key === "K")) {
@@ -521,6 +582,15 @@
     dockStatus.textContent = "Mengetik draf (0%)...";
     statusText.textContent = "Memasukkan draf lengkap ke Google Docs...";
 
+    if (dockControlBtn) {
+      dockControlBtn.style.display = "inline-flex";
+      updatePauseResumeUI(false);
+    }
+    if (windowControlBtn) {
+      windowControlBtn.style.display = "inline-flex";
+      updatePauseResumeUI(false);
+    }
+
     if (window.AutoTyper) {
       setTimeout(() => {
         window.AutoTyper.typeDraft(cleanContent, {
@@ -528,10 +598,25 @@
             const pctMsg = `Mengetik (${p.percent}%)...`;
             dockStatus.textContent = pctMsg;
             statusText.textContent = `Memasukkan draf ke dokumen (${p.percent}%)...`;
+            updatePauseResumeUI(false);
+          },
+          onPause: (p) => {
+            const pctMsg = `Dijeda (${p.percent}%)`;
+            dockStatus.textContent = pctMsg;
+            statusText.textContent = `Pengetikan dijeda (${p.percent}%). Klik 'Lanjutkan' untuk meneruskan.`;
+            updatePauseResumeUI(true);
+          },
+          onResume: (p) => {
+            const pctMsg = `Mengetik (${p.percent}%)...`;
+            dockStatus.textContent = pctMsg;
+            statusText.textContent = `Melanjutkan pengetikan ke dokumen (${p.percent}%)...`;
+            updatePauseResumeUI(false);
           },
           onComplete: () => {
             isTypingInProgress = false;
             dockNav.classList.remove("typing");
+            if (dockControlBtn) dockControlBtn.style.display = "none";
+            if (windowControlBtn) windowControlBtn.style.display = "none";
             dockStatus.textContent = "Selesai (100%)";
             statusText.textContent = "Draf berhasil diketik lengkap ke Google Docs.";
             updateLearnedPageProfile(true);
@@ -542,12 +627,16 @@
           onError: (err) => {
             isTypingInProgress = false;
             dockNav.classList.remove("typing");
+            if (dockControlBtn) dockControlBtn.style.display = "none";
+            if (windowControlBtn) windowControlBtn.style.display = "none";
             dockStatus.textContent = "Error pengetikan";
             statusText.textContent = `Error: ${err}`;
           },
           onCancel: () => {
             isTypingInProgress = false;
             dockNav.classList.remove("typing");
+            if (dockControlBtn) dockControlBtn.style.display = "none";
+            if (windowControlBtn) windowControlBtn.style.display = "none";
             dockStatus.textContent = "Pengetikan dibatalkan";
             statusText.textContent = "Pengetikan dihentikan.";
           }
@@ -556,6 +645,8 @@
     } else {
       isTypingInProgress = false;
       dockNav.classList.remove("typing");
+      if (dockControlBtn) dockControlBtn.style.display = "none";
+      if (windowControlBtn) windowControlBtn.style.display = "none";
       statusText.textContent = "Error: AutoTyper engine tidak tersedia.";
     }
   }

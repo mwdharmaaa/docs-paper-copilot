@@ -89,6 +89,68 @@
   font-family: ui-monospace, monospace;
 }
 
+/* Navigasi Terpadu: Hentikan / Lanjutkan Pengetikan */
+.gemini-dock-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #2a2c2f;
+  border: 1px solid #4a4d51;
+  color: #f1f3f4;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  margin-left: 2px;
+}
+
+.gemini-dock-action-btn:hover {
+  background-color: #383b3e;
+  border-color: #8ab4f8;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.gemini-dock-action-btn.paused {
+  background: linear-gradient(135deg, #185abc, #1a73e8);
+  border-color: #8ab4f8;
+  color: #ffffff;
+}
+
+.gemini-dock-action-btn.paused:hover {
+  background: linear-gradient(135deg, #1a73e8, #4285f4);
+}
+
+.gemini-window-control-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #282a2c;
+  border: 1px solid #3c4043;
+  color: #f1f3f4;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 10px;
+}
+
+.gemini-window-control-btn:hover {
+  background-color: #383b3e;
+  border-color: #8ab4f8;
+}
+
+.gemini-window-control-btn.paused {
+  background-color: #1a3966;
+  border-color: #8ab4f8;
+  color: #8ab4f8;
+}
+
 /* ==========================================================================
    Wide Gemini Web Overlay & Backdrop
    ========================================================================== */
