@@ -559,6 +559,212 @@
     },
 
     /**
+     * Audit komprehensif kesehatan dokumen: Tipografi, PUEBI/Ejaan, dan Kelengkapan Struktur.
+     * Berfungsi selayaknya asisten manusia / editor ahli yang memeriksa naskah.
+     */
+    auditDocumentHealth(docInfo = null) {
+      const doc = docInfo || this.extractFullDocument(50000);
+      const text = doc.fullText || "";
+      const lower = text.toLowerCase();
+
+      const typographyIssues = [];
+      const puebiIssues = [];
+      const structureIssues = [];
+      const healthyHighlights = [];
+
+      // 1. Audit Tipografi & Konsistensi Font
+      const textSpans = document.querySelectorAll(
+        ".kix-lineview-text-block span, .kix-word-htmlelement, .kix-paragraphrenderer span"
+      );
+      const detectedFonts = new Set();
+      const detectedSizes = new Set();
+
+      for (const span of textSpans) {
+        const t = span.textContent?.trim();
+        if (t && t.length > 2 && /[a-zA-Z]/.test(t)) {
+          try {
+            const font = window.getComputedStyle(span).fontFamily;
+            if (font) {
+              const primary = font.split(",")[0].replace(/['"]/g, "").trim();
+              if (primary && !primary.startsWith("docs-")) detectedFonts.add(primary);
+            }
+            const fs = window.getComputedStyle(span).fontSize;
+            if (fs) {
+              const pt = Math.round(parseFloat(fs) * 0.75);
+              if (pt >= 8 && pt <= 72) detectedSizes.add(pt);
+            }
+          } catch {}
+          if (detectedFonts.size >= 5) break;
+        }
+      }
+
+      const fontList = Array.from(detectedFonts);
+      if (fontList.length > 1) {
+        typographyIssues.push({
+          type: "font_mismatch",
+          severity: "warning",
+          title: "Inkonsistensi Jenis Font",
+          desc: `Terdeteksi ${fontList.length} jenis font berbeda dalam dokumen: ${fontList.join(", ")}. Standar skripsi mewajibkan 1 jenis font konsisten (misal: Times New Roman).`,
+          fixHint: "Seragamkan font seluruh naskah ke Times New Roman."
+        });
+      } else if (fontList.length === 1) {
+        healthyHighlights.push(`Jenis font konsisten (${fontList[0]}).`);
+      }
+
+      const alignment = this.detectAlignment();
+      if (!alignment.includes("Justify")) {
+        typographyIssues.push({
+          type: "alignment",
+          severity: "warning",
+          title: "Format Perataan Bukan Justify",
+          desc: `Perataan teks aktif adalah ${alignment}. Karya ilmiah baku mewajibkan perataan Rata Kanan-Kiri (Justify).`,
+          fixHint: "Terapkan format Justify (Ctrl + Shift + J)."
+        });
+      } else {
+        healthyHighlights.push("Format perataan naskah sudah Rata Kanan-Kiri (Justify).");
+      }
+
+      const indentStyle = this.detectIndentStyle();
+      if (indentStyle.includes("Blok")) {
+        typographyIssues.push({
+          type: "indentation",
+          severity: "info",
+          title: "Indentasi Alinea Belum 1x Tab",
+          desc: "Alinea paragraf terdeteksi tanpa penjorokan 1x Tab (~1.27 cm) di awal kalimat.",
+          fixHint: "Gunakan indentasi 1x Tab di awal setiap paragraf baru."
+        });
+      } else {
+        healthyHighlights.push("Indentasi alinea paragraf sudah menjorok rapi (1x Tab).");
+      }
+
+      // 2. Audit PUEBI & Ejaan Baku Bahasa Indonesia
+      const PUEBI_RULES = [
+        { pattern: /\banalisa\b/gi, fix: "analisis", tip: "Gunakan kata serapan baku KBBI 'analisis'" },
+        { pattern: /\bpraktek\b/gi, fix: "praktik", tip: "Gunakan kata baku 'praktik'" },
+        { pattern: /\bmerubah\b/gi, fix: "mengubah", tip: "Bentuk baku berimbuhan me- + ubah adalah 'mengubah'" },
+        { pattern: /\bobyek\b/gi, fix: "objek", tip: "Kata serapan baku menggunakan huruf 'j' (objek)" },
+        { pattern: /\bsubyek\b/gi, fix: "subjek", tip: "Kata serapan baku menggunakan huruf 'j' (subjek)" },
+        { pattern: /\bkwalitas\b/gi, fix: "kualitas", tip: "Kata baku menggunakan 'kua-' (kualitas)" },
+        { pattern: /\bresiko\b/gi, fix: "risiko", tip: "Bentuk baku KBBI adalah 'risiko'" },
+        { pattern: /\befektip\b/gi, fix: "efektif", tip: "Kata serapan baku berakhiran -if (efektif)" },
+        { pattern: /\baktifitas\b/gi, fix: "aktivitas", tip: "Kata benda serapan berakhiran -itas (aktivitas)" },
+        { pattern: /\bkreatifitas\b/gi, fix: "kreativitas", tip: "Kata benda serapan berakhiran -itas (kreativitas)" },
+        { pattern: /\bijin\b/gi, fix: "izin", tip: "Bentuk baku menggunakan huruf 'z' (izin)" },
+        { pattern: /\bhirarki\b/gi, fix: "hierarki", tip: "Bentuk baku menggunakan diftong 'ie' (hierarki)" },
+        { pattern: /\bantri\b/gi, fix: "antre", tip: "Bentuk baku adalah 'antre'" },
+        { pattern: /\bjaman\b/gi, fix: "zaman", tip: "Bentuk baku menggunakan huruf 'z' (zaman)" },
+        { pattern: /\bstandarisasi\b/gi, fix: "standardisasi", tip: "Bentuk baku penyerapan adalah 'standardisasi'" },
+        { pattern: /\bmetodhe\b/gi, fix: "metode", tip: "Bentuk baku adalah 'metode'" },
+        { pattern: /\bkonkrit\b/gi, fix: "konkret", tip: "Bentuk baku adalah 'konkret'" },
+        { pattern: /\bdimana\b/gi, fix: "di mana", tip: "Kata depan 'di' wajib dipisah dari 'mana'" },
+        { pattern: /(?<=\w\s+)di\s*mana(?=\s+\w+)/gi, fix: "yang / tempat", tip: "'di mana' bukan kata penghubung/konjungsi dalam kalimat bahasa Indonesia baku" }
+      ];
+
+      for (const rule of PUEBI_RULES) {
+        const matches = text.match(rule.pattern);
+        if (matches && matches.length > 0) {
+          puebiIssues.push({
+            wrong: matches[0],
+            fix: rule.fix,
+            count: matches.length,
+            tip: rule.tip
+          });
+        }
+      }
+
+      if (puebiIssues.length === 0 && text.length > 100) {
+        healthyHighlights.push("Tidak ditemukan kata tidak baku populer (PUEBI terpantau rapi).");
+      }
+
+      // 3. Audit Kelengkapan Struktur Naskah
+      const hasBab1 = /BAB\s+(?:I|1)\b/i.test(text) || lower.includes("pendahuluan");
+      if (hasBab1) {
+        const hasLatarBelakang = lower.includes("latar belakang");
+        const hasRumusan = lower.includes("rumusan masalah") || lower.includes("identifikasi masalah");
+        const hasTujuan = lower.includes("tujuan penelitian") || lower.includes("tujuan penulisan");
+        const hasManfaat = lower.includes("manfaat penelitian");
+
+        if (!hasLatarBelakang) {
+          structureIssues.push({
+            component: "Latar Belakang",
+            desc: "Bab 1 belum mencantumkan subbab Latar Belakang Masalah.",
+            urgency: "high"
+          });
+        }
+        if (!hasRumusan) {
+          structureIssues.push({
+            component: "Rumusan Masalah",
+            desc: "Bab 1 belum memiliki subbab Rumusan Masalah yang spesifik.",
+            urgency: "high"
+          });
+        }
+        if (!hasTujuan) {
+          structureIssues.push({
+            component: "Tujuan Penelitian",
+            desc: "Bab 1 belum mencantumkan butir Tujuan Penelitian yang menjawab rumusan masalah.",
+            urgency: "medium"
+          });
+        }
+        if (!hasManfaat) {
+          structureIssues.push({
+            component: "Manfaat Penelitian",
+            desc: "Bab 1 belum dilengkapi subbab Manfaat Penelitian (teoretis & praktis).",
+            urgency: "low"
+          });
+        }
+      }
+
+      if (doc.wordCount > 300) {
+        const hasDaftarPustaka = /DAFTAR\s+PUSTAKA/i.test(text);
+        if (!hasDaftarPustaka) {
+          structureIssues.push({
+            component: "Daftar Pustaka",
+            desc: "Dokumen telah mencapai >300 kata namun belum memiliki bagian DAFTAR PUSTAKA.",
+            urgency: "medium"
+          });
+        }
+      }
+
+      // 4. Perhitungan Skor Kesehatan (Health Score: 0 - 100)
+      let score = 100;
+      if (fontList.length > 1) score -= 8;
+      if (!alignment.includes("Justify")) score -= 6;
+      if (indentStyle.includes("Blok")) score -= 4;
+
+      const puebiPenalty = Math.min(20, puebiIssues.reduce((acc, curr) => acc + (curr.count * 2), 0));
+      score -= puebiPenalty;
+
+      const structurePenalty = structureIssues.reduce((acc, curr) => {
+        if (curr.urgency === "high") return acc + 8;
+        if (curr.urgency === "medium") return acc + 5;
+        return acc + 3;
+      }, 0);
+      score -= Math.min(30, structurePenalty);
+
+      score = Math.max(20, Math.min(100, score));
+
+      let scoreCategory = "Sangat Prima (Standar Akademik)";
+      if (score < 60) {
+        scoreCategory = "Perlu Audit & Kalibrasi Menyeluruh";
+      } else if (score < 75) {
+        scoreCategory = "Perlu Penyesuaian Format & PUEBI";
+      } else if (score < 90) {
+        scoreCategory = "Baik (Perlu Sedikit Kalibrasi)";
+      }
+
+      return {
+        score,
+        scoreCategory,
+        totalIssues: typographyIssues.length + puebiIssues.length + structureIssues.length,
+        typographyIssues,
+        puebiIssues,
+        structureIssues,
+        healthyHighlights,
+        summary: `Skor Kesehatan: ${score}/100 (${scoreCategory}). Ditemukan ${typographyIssues.length} isu tipografi, ${puebiIssues.length} isu PUEBI, dan ${structureIssues.length} kelengkapan struktur.`
+      };
+    },
+
+    /**
      * Master function: Learn the page's complete typography, layout, and style profile.
      */
     learnPage() {
@@ -575,6 +781,8 @@
       const cleanAlign = alignment.includes("Justify") ? "Justify" : "Rata Kiri";
       const cleanSpacing = lineSpacing.split(" ")[0];
       const badgeText = `${fontFamily} ${fontSize} • Spasi ${cleanSpacing} • ${cleanAlign} • ${genreTag}`;
+
+      const docHealth = this.auditDocumentHealth(docInfo);
 
       const profile = {
         docTitle: docInfo.docTitle || "Dokumen Google Docs",
@@ -600,6 +808,7 @@
         fullText: docInfo.fullText || "",
         sampleExcerpt: docInfo.fullText ? docInfo.fullText.slice(0, 1500) : "",
         badgeText,
+        docHealth,
         timestamp: Date.now()
       };
 

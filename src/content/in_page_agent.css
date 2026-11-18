@@ -898,6 +898,137 @@
 }
 
 /* ==========================================================================
+   Dokter Dokumen & Interactive Clarification Styles (Human Assistant)
+   ========================================================================== */
+.gemini-health-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #1e1f20;
+  border: 1px solid #333537;
+  color: #c4c7c5;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.gemini-health-badge-btn:hover {
+  background-color: #282a2c;
+  border-color: #8ab4f8;
+  color: #ffffff;
+}
+
+.health-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #34a853;
+  display: inline-block;
+}
+
+.gemini-health-sidebar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gemini-health-mini-desc {
+  font-size: 10px;
+  color: #9aa0a6;
+  line-height: 1.35;
+  padding: 2px 0;
+}
+
+.health-good {
+  color: #34a853 !important;
+}
+
+.health-warning {
+  color: #fbbc04 !important;
+}
+
+.health-danger {
+  color: #ea4335 !important;
+}
+
+/* Clarification & Consultation Card */
+.gemini-clarification-card {
+  background-color: #16181d;
+  border: 1px solid #2d3748;
+  border-left: 3px solid #60a5fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.gemini-clarification-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.gemini-clarification-question {
+  font-size: 13px;
+  color: #f1f5f9;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.gemini-clarification-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gemini-clarification-opt-btn {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.gemini-clarification-opt-btn:hover {
+  background-color: #334155;
+  border-color: #60a5fa;
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.gemini-clarification-opt-btn.selected {
+  background-color: #1e3a8a;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.gemini-chip-btn.highlight {
+  border-color: #60a5fa;
+  color: #93c5fd;
+  background-color: rgba(96, 165, 250, 0.08);
+}
+
+.gemini-chip-btn.highlight:hover {
+  background-color: rgba(96, 165, 250, 0.16);
+  color: #ffffff;
+}
+
+/* ==========================================================================
    PERMANENT SUPPRESSION: Google Docs Spell & Grammar Checkup Surface / Popups
    Menonaktifkan dan menyembunyikan total popup saran "Ejaan dan tata bahasa",
    tombol Abaikan / Terima, dan seluruh turunan docsSpellWizCheckupSurface.

@@ -27,6 +27,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const relearnSidepanelBtn = document.getElementById("btn-relearn-sidepanel");
   const btnModeDiscuss = document.getElementById("btn-mode-discuss");
   const btnModeWrite = document.getElementById("btn-mode-write");
+  const docHealthScore = document.getElementById("doc-health-score");
+  const btnToggleHealth = document.getElementById("btn-toggle-health-drawer");
+  const docHealthDrawer = document.getElementById("doc-health-drawer");
+  const btnCloseHealth = document.getElementById("btn-close-health-drawer");
+  const healthDrawerBody = document.getElementById("health-drawer-body");
+  const btnHealthCalibrate = document.getElementById("btn-health-calibrate");
+  const btnHealthFixPuebi = document.getElementById("btn-health-fix-puebi");
 
   let currentMode = "discuss"; // "discuss" | "write"
   let conversationHistory = []; // Array of { role: "user" | "model", text: string }
@@ -70,12 +77,84 @@ document.addEventListener("DOMContentLoaded", async () => {
     footerStatus.textContent = "Pengaturan tersimpan.";
   };
 
+  // Dokter Dokumen: Health UI Controller
+  function updateHealthUI(health) {
+    if (!health) return;
+    if (docHealthScore) {
+      docHealthScore.textContent = `${health.score}/100 • ${health.scoreCategory.split(" ")[0]}`;
+      if (health.score >= 90) {
+        docHealthScore.style.color = "#34a853";
+      } else if (health.score >= 70) {
+        docHealthScore.style.color = "#fbbc04";
+      } else {
+        docHealthScore.style.color = "#ea4335";
+      }
+    }
+
+    if (healthDrawerBody) {
+      let html = "";
+      if (health.typographyIssues && health.typographyIssues.length > 0) {
+        for (const iss of health.typographyIssues) {
+          html += `<div class="health-audit-item warning"><span class="health-tag format">Format</span> <strong>${iss.title}:</strong> ${iss.desc}</div>`;
+        }
+      }
+      if (health.puebiIssues && health.puebiIssues.length > 0) {
+        const words = health.puebiIssues.map(p => `<code>${p.wrong}</code> &rarr; <code>${p.fix}</code>`).join(", ");
+        html += `<div class="health-audit-item warning"><span class="health-tag puebi">PUEBI</span> Kata tidak baku: ${words}</div>`;
+      }
+      if (health.structureIssues && health.structureIssues.length > 0) {
+        for (const iss of health.structureIssues) {
+          html += `<div class="health-audit-item danger"><span class="health-tag structure">Struktur</span> <strong>${iss.component}:</strong> ${iss.desc}</div>`;
+        }
+      }
+      if (health.healthyHighlights && health.healthyHighlights.length > 0) {
+        for (const h of health.healthyHighlights) {
+          html += `<div class="health-audit-item ok"><span class="health-tag ok">Prima</span> ${h}</div>`;
+        }
+      }
+      if (!html) {
+        html = '<div class="health-audit-item ok"><span class="health-tag ok">Prima</span> Dokumen terpantau sangat sehat dan sesuai kaidah akademik.</div>';
+      }
+      healthDrawerBody.innerHTML = html;
+    }
+  }
+
+  if (btnToggleHealth && docHealthDrawer) {
+    btnToggleHealth.onclick = () => {
+      docHealthDrawer.style.display = docHealthDrawer.style.display === "none" ? "flex" : "none";
+    };
+  }
+  if (btnCloseHealth && docHealthDrawer) {
+    btnCloseHealth.onclick = () => {
+      docHealthDrawer.style.display = "none";
+    };
+  }
+
+  if (btnHealthCalibrate) {
+    btnHealthCalibrate.onclick = async () => {
+      footerStatus.textContent = "Mengalibrasi tipografi ke 12pt Justify...";
+      const ok = await ActionHandlers.calibrateTypography();
+      footerStatus.textContent = ok ? "Tipografi berhasil diseragamkan ke 12pt Justify." : "Gagal kalibrasi tipografi.";
+      refreshPageProfile(true);
+    };
+  }
+
+  if (btnHealthFixPuebi) {
+    btnHealthFixPuebi.onclick = () => {
+      if (docHealthDrawer) docHealthDrawer.style.display = "none";
+      submitPrompt("Koreksi seluruh salah ketik, tanda baca, dan kata tidak baku sesuai kaidah baku PUEBI/KBBI pada naskah ini.");
+    };
+  }
+
   // Sync Doc Info, Page Profile & Selection
   async function refreshPageProfile(forceRefresh = false) {
     if (pageProfileSummary) pageProfileSummary.textContent = "Mempelajari format halaman...";
     const profile = await ActionHandlers.fetchPageProfile(forceRefresh);
     if (profile) {
       currentPageProfile = profile;
+      if (profile.docHealth) {
+        updateHealthUI(profile.docHealth);
+      }
       if (pageProfileSummary) {
         pageProfileSummary.textContent = profile.badgeText || `${profile.fontFamily} ${profile.fontSize} - ${profile.genreTag}`;
         pageProfileSummary.title = `Font: ${profile.fontFamily} (${profile.fontSize})\nSpasi: ${profile.lineSpacing}\nMargin: ${profile.margins}\nPerataan: ${profile.alignment}\nGaya: ${profile.writingStyle}`;
@@ -90,6 +169,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (info?.title) docTitleLabel.textContent = info.title;
     if (info?.pageProfile) {
       currentPageProfile = info.pageProfile;
+      if (currentPageProfile.docHealth) {
+        updateHealthUI(currentPageProfile.docHealth);
+      }
       if (pageProfileSummary) {
         pageProfileSummary.textContent = currentPageProfile.badgeText;
         pageProfileSummary.title = `Font: ${currentPageProfile.fontFamily} (${currentPageProfile.fontSize})\nSpasi: ${currentPageProfile.lineSpacing}\nMargin: ${currentPageProfile.margins}\nPerataan: ${currentPageProfile.alignment}\nGaya: ${currentPageProfile.writingStyle}`;
@@ -155,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const speed = isNaN(rawSpeed) ? 0 : rawSpeed;
       const card = renderGeminiCard(responseText, speed, (status) => {
         footerStatus.textContent = status;
-      }, currentMode);
+      }, currentMode, (optPrompt) => submitPrompt(optPrompt));
 
       messagesList.appendChild(card);
       card.scrollIntoView({ behavior: "smooth" });

@@ -72,6 +72,17 @@
       return false;
     }
 
+    if (request.action === "GET_DOC_HEALTH" || request.action === "AUDIT_DOC_HEALTH") {
+      const health = window.PageLearner && typeof window.PageLearner.auditDocumentHealth === "function"
+        ? window.PageLearner.auditDocumentHealth()
+        : { score: 100, scoreCategory: "Standar", typographyIssues: [], puebiIssues: [], structureIssues: [], healthyHighlights: [] };
+      sendResponse({
+        success: true,
+        health
+      });
+      return false;
+    }
+
     return false;
   });
 

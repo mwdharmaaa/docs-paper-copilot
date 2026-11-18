@@ -74,14 +74,42 @@
   // ==========================================================================
   function parseResponseDraft(rawText) {
     if (!rawText || typeof rawText !== "string") {
-      return { discussionText: "", draftText: "", hasDraft: false };
+      return { discussionText: "", draftText: "", clarification: null, hasDraft: false, hasClarification: false };
+    }
+
+    let textToProcess = rawText;
+    let clarification = null;
+    let hasClarification = false;
+
+    // Ekstraksi blok klarifikasi proaktif
+    const clarMatch = textToProcess.match(/<{2,4}\s*KLARIFIKASI\s*>{2,4}([\s\S]*?)<{2,4}\s*AKHIR[_\s]*KLARIFIKASI\s*>{2,4}/i);
+    if (clarMatch) {
+      hasClarification = true;
+      const clarBody = clarMatch[1].trim();
+      const lines = clarBody.split("\n").map(l => l.trim()).filter(Boolean);
+      let question = "";
+      const options = [];
+      for (const l of lines) {
+        if (/^Pertanyaan:/i.test(l)) {
+          question = l.replace(/^Pertanyaan:\s*/i, "");
+        } else if (/^[-*•]?\s*Opsi\s+([A-Z0-9]+)[:.-]\s*(.*)/i.test(l)) {
+          const m = l.match(/^[-*•]?\s*Opsi\s+([A-Z0-9]+)[:.-]\s*(.*)/i);
+          options.push({ label: `Opsi ${m[1]}`, text: m[2] });
+        } else if (/^[-*•]\s*(.*)/.test(l)) {
+          options.push({ label: `Pilihan ${options.length + 1}`, text: l.replace(/^[-*•]\s*/, "") });
+        } else if (!question) {
+          question = l;
+        }
+      }
+      clarification = { question: question || "Mau difokuskan ke arah mana?", options };
+      textToProcess = textToProcess.replace(/<{2,4}\s*KLARIFIKASI\s*>{2,4}[\s\S]*?<{2,4}\s*AKHIR[_\s]*KLARIFIKASI\s*>{2,4}/i, "").trim();
     }
 
     // 1. Tag draf lengkap atau tag pembuka yang terpotong (unclosed)
-    const openMatch = rawText.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+    const openMatch = textToProcess.match(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
     if (openMatch) {
-      const discussionHead = rawText.substring(0, openMatch.index).trim();
-      const afterOpen = rawText.substring(openMatch.index + openMatch[0].length);
+      const discussionHead = textToProcess.substring(0, openMatch.index).trim();
+      const afterOpen = textToProcess.substring(openMatch.index + openMatch[0].length);
 
       const closeMatch = afterOpen.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
       let draftText = "";
@@ -91,7 +119,6 @@
         draftText = afterOpen.substring(0, closeMatch.index).trim();
         discussionTail = afterOpen.substring(closeMatch.index + closeMatch[0].length).trim();
       } else {
-        // Output terpotong di tengah jalan atau tidak ada tag penutup: seluruh isi setelah pembuka adalah draf
         draftText = afterOpen.trim();
       }
 
@@ -99,34 +126,36 @@
       return {
         discussionText: discussionText.trim(),
         draftText: draftText.trim(),
-        hasDraft: Boolean(draftText)
+        clarification,
+        hasDraft: Boolean(draftText),
+        hasClarification
       };
     }
 
     // 2. Tag penutup saja
-    const closeMatch = rawText.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
+    const closeMatch = textToProcess.match(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/i);
     if (closeMatch) {
-      const before = rawText.substring(0, closeMatch.index).trim();
-      const after = rawText.substring(closeMatch.index + closeMatch[0].length).trim();
+      const before = textToProcess.substring(0, closeMatch.index).trim();
+      const after = textToProcess.substring(closeMatch.index + closeMatch[0].length).trim();
       const headingMatch = before.match(/(?:^|\n+)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
       if (headingMatch && headingMatch.index !== undefined) {
         const splitIdx = headingMatch.index === 0 ? 0 : headingMatch.index;
         const discHead = before.substring(0, splitIdx).trim();
         const draft = before.substring(splitIdx).trim();
         const discussionText = (discHead ? discHead + "\n\n" : "") + after;
-        return { discussionText: discussionText.trim(), draftText: draft, hasDraft: true };
+        return { discussionText: discussionText.trim(), draftText: draft, clarification, hasDraft: true, hasClarification };
       }
-      return { discussionText: after, draftText: before, hasDraft: true };
+      return { discussionText: after, draftText: before, clarification, hasDraft: true, hasClarification };
     }
 
     // 3. Header akademis natural (BAB 1 / DAFTAR ISI)
-    const headingMatch = rawText.match(/(?:^|\n+)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
+    const headingMatch = textToProcess.match(/(?:^|\n+)(BAB\s+(?:[IVXLCDM]+|\d+)|DAFTAR\s+ISI|[A-Z0-9\s,:()\-]{15,}\n|\d+\.\d+\s+[A-Z])/i);
     if (headingMatch && headingMatch.index !== undefined) {
       if (headingMatch.index === 0) {
-        return { discussionText: "", draftText: rawText.trim(), hasDraft: true };
+        return { discussionText: "", draftText: textToProcess.trim(), clarification, hasDraft: true, hasClarification };
       }
-      const discHead = rawText.substring(0, headingMatch.index).trim();
-      let draft = rawText.substring(headingMatch.index).trim();
+      const discHead = textToProcess.substring(0, headingMatch.index).trim();
+      let draft = textToProcess.substring(headingMatch.index).trim();
 
       const trailMatch = draft.match(/\n+(?:Bagaimana menurut Anda|Apakah Anda|Silakan beritahu|Jika Anda ingin).*$/is);
       let discTail = "";
@@ -135,16 +164,16 @@
         draft = draft.substring(0, trailMatch.index).trim();
       }
       const discussionText = [discHead, discTail].filter(Boolean).join("\n\n");
-      return { discussionText: discussionText.trim(), draftText: draft, hasDraft: true };
+      return { discussionText: discussionText.trim(), draftText: draft, clarification, hasDraft: true, hasClarification };
     }
 
     // Bersihkan sisa tag jika ada yang tertinggal
-    const cleanText = rawText
+    const cleanText = textToProcess
       .replace(/<{2,4}\s*DRAF[_\s]*DOKUMEN\s*>{2,4}/gi, "")
       .replace(/<{2,4}\s*AKHIR[_\s]*DRAF[_\s]*DOKUMEN\s*>{2,4}/gi, "")
       .trim();
 
-    return { discussionText: cleanText, draftText: cleanText, hasDraft: false };
+    return { discussionText: cleanText, draftText: cleanText, clarification, hasDraft: false, hasClarification };
   }
 
   // ==========================================================================
@@ -218,6 +247,10 @@
           <div class="gemini-header-center">
             <span id="gemini-doc-meta-title" class="gemini-doc-meta-title">Dokumen Google Docs</span>
             <span id="gemini-page-format-chip" class="gemini-page-format-chip">Arial 12pt • Justify</span>
+            <button type="button" id="gemini-health-badge-btn" class="gemini-health-badge-btn" title="Diagnosa Dokter Dokumen (Klik untuk Konsultasi)">
+              <span class="health-pulse-dot"></span>
+              <span id="gemini-health-badge-label">Dokter: 100%</span>
+            </button>
             <button type="button" id="gemini-window-control-btn" class="gemini-window-control-btn" style="display: none;" title="Hentikan / Lanjutkan Pengetikan">
               <span id="gemini-window-control-icon">⏸</span>
               <span id="gemini-window-control-label">Hentikan</span>
@@ -280,6 +313,22 @@
               </button>
             </div>
 
+            <div class="gemini-sidebar-section-title">Dokter Dokumen (Audit Naskah)</div>
+            <div class="gemini-page-format-card gemini-health-sidebar-card">
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Skor Naskah</span>
+                <span id="gemini-sidebar-health-score" class="gemini-format-val health-good">100/100</span>
+              </div>
+              <div class="gemini-format-row">
+                <span class="gemini-format-label">Status</span>
+                <span id="gemini-sidebar-health-status" class="gemini-format-val">Sangat Prima</span>
+              </div>
+              <div id="gemini-sidebar-health-desc" class="gemini-health-mini-desc">Tipografi & PUEBI siap diaudit</div>
+              <button type="button" id="gemini-health-run-audit" class="gemini-relearn-btn" title="Jalankan audit naskah komprehensif">
+                🩺 Audit Dokter Dokumen
+              </button>
+            </div>
+
             <div class="gemini-sidebar-section-title">Riwayat Sesi</div>
             <div id="gemini-history-list" class="gemini-history-list"></div>
 
@@ -324,6 +373,7 @@
             <!-- Bottom Floating Prompt Bar -->
             <div class="gemini-prompt-bar-area">
               <div class="gemini-quick-chips-row">
+                <button type="button" class="gemini-chip-btn highlight" data-prompt="Jalankan Dokter Dokumen: analisa kesehatan tipografi, PUEBI, dan kelengkapan struktur naskah ini serta berikan solusi perbaikannya">🩺 Dokter Dokumen</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Analisis dokumen ini secara lengkap: judul, jenis font, ukuran, margin, spasi, struktur bab, dan ringkasan isi yang sudah tersedia.">Analisa Dokumen</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Lanjutkan pengetikan naskah dokumen ini langsung dari titik henti terakhir. Tulis alinea selanjutnya secara berkesinambungan dan berbobot tanpa mengulang apa yang sudah ada.">Lanjutkan Naskah</button>
                 <button type="button" class="gemini-chip-btn" data-prompt="Tuliskan draf pembuka tentang urgensi topik ini">Draf Pembuka</button>
@@ -373,11 +423,17 @@
 
   const docMetaTitle = document.getElementById("gemini-doc-meta-title");
   const headerFormatChip = document.getElementById("gemini-page-format-chip");
+  const healthBadgeBtn = document.getElementById("gemini-health-badge-btn");
+  const healthBadgeLabel = document.getElementById("gemini-health-badge-label");
   const sidebarFont = document.getElementById("gemini-sidebar-font");
   const sidebarSpacing = document.getElementById("gemini-sidebar-spacing");
   const sidebarAlign = document.getElementById("gemini-sidebar-align");
   const sidebarTone = document.getElementById("gemini-sidebar-tone");
   const btnRelearn = document.getElementById("gemini-relearn-btn");
+  const sidebarHealthScore = document.getElementById("gemini-sidebar-health-score");
+  const sidebarHealthStatus = document.getElementById("gemini-sidebar-health-status");
+  const sidebarHealthDesc = document.getElementById("gemini-sidebar-health-desc");
+  const btnRunAudit = document.getElementById("gemini-health-run-audit");
 
   const btnNewChat = document.getElementById("gemini-new-chat");
   const btnClearChat = document.getElementById("gemini-clear-chat");
@@ -545,8 +601,44 @@
         if (sidebarSpacing) sidebarSpacing.textContent = `Spasi ${activePageProfile.lineSpacing.split(" ")[0]}`;
         if (sidebarAlign) sidebarAlign.textContent = activePageProfile.alignment.includes("Justify") ? "Justify" : "Rata Kiri";
         if (sidebarTone) sidebarTone.textContent = activePageProfile.genreTag || "Skripsi Formal";
+
+        // Update Dokter Dokumen indicators
+        if (activePageProfile.docHealth) {
+          const h = activePageProfile.docHealth;
+          if (healthBadgeLabel) {
+            healthBadgeLabel.textContent = `Dokter: ${h.score}%`;
+          }
+          if (sidebarHealthScore) {
+            sidebarHealthScore.textContent = `${h.score}/100`;
+            if (h.score >= 90) {
+              sidebarHealthScore.style.color = "#34a853";
+            } else if (h.score >= 70) {
+              sidebarHealthScore.style.color = "#fbbc04";
+            } else {
+              sidebarHealthScore.style.color = "#ea4335";
+            }
+          }
+          if (sidebarHealthStatus) {
+            sidebarHealthStatus.textContent = h.scoreCategory.split(" ")[0];
+          }
+          if (sidebarHealthDesc) {
+            sidebarHealthDesc.textContent = `${h.totalIssues} isu terdeteksi (${h.typographyIssues.length} format, ${h.puebiIssues.length} PUEBI)`;
+          }
+        }
       }
     }
+  }
+
+  if (healthBadgeBtn) {
+    healthBadgeBtn.onclick = () => {
+      submitPrompt("Jalankan Dokter Dokumen: analisa kesehatan tipografi, PUEBI, dan kelengkapan struktur naskah ini serta berikan solusi perbaikannya");
+    };
+  }
+
+  if (btnRunAudit) {
+    btnRunAudit.onclick = () => {
+      submitPrompt("Jalankan Dokter Dokumen: analisa kesehatan tipografi, PUEBI, dan kelengkapan struktur naskah ini serta berikan solusi perbaikannya");
+    };
   }
 
   btnRelearn.onclick = async (e) => {
@@ -683,7 +775,36 @@
       const bubble = document.createElement("div");
       bubble.className = "gemini-msg-bubble assistant";
 
-      const { discussionText, draftText, hasDraft } = parseResponseDraft(text);
+      const { discussionText, draftText, clarification, hasDraft, hasClarification } = parseResponseDraft(text);
+
+      // Render Interactive Consultation Card (Co-Author Clarification Options)
+      if (hasClarification && clarification) {
+        const clarCard = document.createElement("div");
+        clarCard.className = "gemini-clarification-card";
+        clarCard.innerHTML = `
+          <div class="gemini-clarification-header">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.67z"/>
+            </svg>
+            <span>Konsultasi Arah Penulisan (Co-Author)</span>
+          </div>
+          <div class="gemini-clarification-question">${escapeHtml(clarification.question)}</div>
+          <div class="gemini-clarification-options"></div>
+        `;
+        const optsContainer = clarCard.querySelector(".gemini-clarification-options");
+        clarification.options.forEach((opt) => {
+          const optBtn = document.createElement("button");
+          optBtn.type = "button";
+          optBtn.className = "gemini-clarification-opt-btn";
+          optBtn.innerHTML = `<strong>${escapeHtml(opt.label)}:</strong> ${escapeHtml(opt.text)}`;
+          optBtn.onclick = () => {
+            optBtn.classList.add("selected");
+            submitPrompt(`Gunakan ${opt.label}: ${opt.text}. Kembangkan naskah dokumen ini lebih mendalam sesuai fokus tersebut.`);
+          };
+          optsContainer.appendChild(optBtn);
+        });
+        bubble.appendChild(clarCard);
+      }
 
       // Markdown body
       if (discussionText) {

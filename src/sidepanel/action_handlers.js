@@ -44,6 +44,32 @@ export const ActionHandlers = {
     }
   },
 
+  async fetchDocHealth() {
+    const tab = await this.getActiveTab();
+    if (!tab?.id) return null;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, {
+        action: "GET_DOC_HEALTH"
+      });
+      return res?.health || null;
+    } catch {
+      return null;
+    }
+  },
+
+  async calibrateTypography() {
+    const tab = await this.getActiveTab();
+    if (!tab?.id) return false;
+    try {
+      const res = await chrome.tabs.sendMessage(tab.id, {
+        action: "CALIBRATE_TYPOGRAPHY"
+      });
+      return res?.success || false;
+    } catch {
+      return false;
+    }
+  },
+
   async autoTypeToDocs(text, speedMs = 0, targetSection = null, targetPosition = "end") {
     if (!text) throw new Error("Tidak ada konten untuk diketik.");
     const tab = await this.getActiveTab();

@@ -652,3 +652,204 @@ input:focus, select:focus {
 .text-link-btn:hover {
   color: var(--text-secondary);
 }
+
+/* Dokter Dokumen Health Bar & Drawer */
+.doc-health-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #1a1a1c;
+  border: 1px solid var(--border-subtle);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.health-indicator-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.health-badge-icon {
+  font-size: 12px;
+}
+
+.health-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.health-score-val {
+  color: #34a853;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.health-detail-btn {
+  background-color: #27272a;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.health-detail-btn:hover {
+  background-color: #3f3f46;
+  color: #ffffff;
+}
+
+.doc-health-drawer {
+  display: flex;
+  flex-direction: column;
+  background-color: #141416;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.health-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+}
+
+.health-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.health-audit-item {
+  padding: 6px 8px;
+  border-radius: 5px;
+  background-color: #1e1e22;
+  border-left: 3px solid #71717a;
+  line-height: 1.4;
+  color: #d4d4d8;
+}
+
+.health-audit-item.warning {
+  border-left-color: #fbbc04;
+}
+
+.health-audit-item.danger {
+  border-left-color: #ea4335;
+}
+
+.health-audit-item.ok {
+  border-left-color: #34a853;
+}
+
+.health-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+}
+
+.health-tag.format { background-color: #3b2a00; color: #fbbc04; }
+.health-tag.puebi { background-color: #3b1400; color: #ff8c00; }
+.health-tag.structure { background-color: #3b0000; color: #ea4335; }
+.health-tag.ok { background-color: #0d381e; color: #34a853; }
+
+.health-drawer-actions {
+  display: flex;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.health-action-btn {
+  flex: 1;
+  background-color: #27272a;
+  border: 1px solid var(--border-subtle);
+  color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.health-action-btn:hover {
+  background-color: #3f3f46;
+  border-color: #71717a;
+}
+
+/* Interactive Clarification Card (Consultation & Quick Options) */
+.gemini-clarification-card {
+  background-color: #16181d;
+  border: 1px solid #2d3748;
+  border-left: 3px solid #60a5fa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gemini-clarification-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.gemini-clarification-question {
+  font-size: 12px;
+  color: #f1f5f9;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.gemini-clarification-options {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gemini-clarification-opt-btn {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.35;
+}
+
+.gemini-clarification-opt-btn:hover {
+  background-color: #334155;
+  border-color: #60a5fa;
+  color: #ffffff;
+  transform: translateX(2px);
+}
+
+.gemini-clarification-opt-btn.selected {
+  background-color: #1e3a8a;
+  border-color: #3b82f6;
+  color: #ffffff;
+}

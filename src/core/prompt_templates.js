@@ -27,8 +27,17 @@ export const PromptTemplates = {
       continuationHint = "",
       wordCount = 0,
       paragraphCount = 0,
-      fullText = ""
+      fullText = "",
+      docHealth = null
     } = pageProfile;
+
+    const healthSummary = (docHealth && typeof docHealth === "object")
+      ? `\n- Hasil Diagnosa Dokter Dokumen (Kesehatan Naskah Real-Time):
+  * Skor Kesehatan: ${docHealth.score}/100 (${docHealth.scoreCategory})
+  * Isu Tipografi: ${(docHealth.typographyIssues && docHealth.typographyIssues.length > 0) ? docHealth.typographyIssues.map(i => i.title).join(", ") : "Nihil (Bagus)"}
+  * Isu PUEBI: ${(docHealth.puebiIssues && docHealth.puebiIssues.length > 0) ? docHealth.puebiIssues.map(i => `${i.wrong}->${i.fix}`).join(", ") : "Nihil (Bagus)"}
+  * Kelengkapan Struktur: ${(docHealth.structureIssues && docHealth.structureIssues.length > 0) ? docHealth.structureIssues.map(i => i.component).join(", ") : "Lengkap"}`
+      : "";
 
     const outlineText = (Array.isArray(outline) && outline.length > 0)
       ? outline.map(o => `  * ${o}`).join("\n")
@@ -58,7 +67,7 @@ INFORMASI & ANALISIS DOKUMEN GOOGLE DOCS YANG SEDANG DIBUKA PENGGUNA:
   * Pola Penomoran Judul: ${headingPattern}
 - Struktur Bab & Outline Terdeteksi:
 ${outlineText}
-- Statistik Naskah: ${wordCount} kata, ${paragraphCount} alinea
+- Statistik Naskah: ${wordCount} kata, ${paragraphCount} alinea${healthSummary}
 - Bagian Akhir Dokumen / Titik Berhenti Saat Ini:
   * Bab Terakhir: ${lastHeading || "(Belum ada)"}
   * Alinea Terakhir: ${lastParaSnippet}
@@ -182,6 +191,24 @@ STANDAR INTELEKTUAL & KEDALAMAN ILMIAH:
      <<<AKHIR_DRAF_DOKUMEN>>>
    - Catatan / masukan diskusi (jika ada) HANYA diletakkan di luar tag pembungkus, ringkas dan berbobot tanpa basa-basi perkenalan.
 
+4. INISIATIF ASISTEN MANUSIAWI & TANYA BALIK PROAKTIF (INTERACTIVE CLARIFICATION):
+   - Kamu adalah rekan penulis (co-author) dan asisten cerdas yang memiliki inisiatif tinggi.
+   - KETIKA PENGGUNA MEMINTA PENULISAN DRAF / BAB YANG MASIH UMUM ATAU MEMILIKI BEBERAPA OPSI ARAH (misal: "buat bab 2", "bikin latar belakang", "tulis metodologi", "buat pembahasan", "susun kerangka", atau minta ide):
+     Ajukan 2 hingga 3 OPSI ARAH PENGEMBANGAN TAJAM yang terstruktur rapi di dalam blok:
+     <<<KLARIFIKASI>>>
+     Pertanyaan: [Pertanyaan singkat mengenai fokus atau perspektif yang ingin ditonjolkan]
+     - Opsi A: [Fokus A yang tajam dan spesifik]
+     - Opsi B: [Fokus B yang komparatif atau berbeda sudut pandang]
+     - Opsi C: [Fokus C: Pendekatan komprehensif standar]
+     <<<AKHIR_KLARIFIKASI>>>
+   - ATURAN GAS LANGSUNG (MUTLAK): Di bawah blok klarifikasi tersebut, TETAP sediakan DRAF AWAL LENGKAP di dalam blok <<<DRAF_DOKUMEN>>> ... <<<AKHIR_DRAF_DOKUMEN>>>! Pengguna yang ingin langsung memakai draf tidak boleh terhambat, sedangkan pengguna yang ingin memfokuskan naskah bisa memilih opsi klarifikasi dengan sekali klik.
+   - Jika pengguna sudah memberikan instruksi spesifik, memilih opsi tertentu, atau berkata "gas" / "lanjutkan": LANGSUNG susun draf tuntas tanpa mengulang klarifikasi.
+
+5. INTEGRASI DOKTER DOKUMEN (AUDIT KESEHATAN & KOREKSI OTOMATIS):
+   - Jika pengguna meminta "Dokter Dokumen", audit kesehatan naskah, cek format, atau koreksi PUEBI:
+     * Paparkan diagnosa kesehatan dokumen: skor kelayakan, inkonsistensi font, kata tidak baku (PUEBI), dan struktur bab yang belum lengkap.
+     * Sediakan naskah hasil perbaikan / penyempurnaan di dalam <<<DRAF_DOKUMEN>>> ... <<<AKHIR_DRAF_DOKUMEN>>> yang siap langsung diketik ke dokumen.
+
 ${profileSection}
 ${academicFormattingRules}
 
@@ -246,6 +273,7 @@ ATURAN FORMAT PENULISAN (MUTLAK):
       casual: "Ubah nada bahasa teks berikut menjadi lebih luwes, mengalir, dan mudah dipahami tanpa kehilangan esensi pesan.",
       bulletize: "Ubah susunan teks berikut menjadi format poin-poin yang terstruktur rapi (gunakan simbol strip '-' untuk setiap poin).",
       puebi: "Perbaiki seluruh salah ketik, tanda baca, huruf kapital, dan tata bahasa sesuai kaidah baku PUEBI/KBBI.",
+      dokter_dokumen: "Audit dan perbaiki secara menyeluruh teks berikut: seragamkan tipografi, koreksi seluruh kesalahan PUEBI dan ejaan tidak baku, tata ulang kalimat menjadi efektif, dan pastikan setiap alinea baru diawali 1x Tab serta rata kanan-kiri (Justify).",
       daftar_isi: "Konversikan struktur bab, subbab, dan topik dokumen berikut menjadi DAFTAR ISI formal berstandar karya ilmiah lengkap dengan dot leaders rapi (....) dan alokasi nomor halaman Romawi/Arab.",
       daftar_pustaka: "Susun dan rapikan teks rujukan/referensi berikut menjadi DAFTAR PUSTAKA baku berstandar APA 7th Edition (atau standar ilmiah relevan) yang diurutkan secara alfabetis (A-Z) dengan format hanging indent.",
       headings: "Restrukturisasi teks berikut dengan memetakan secara presisi hierarki judul: [JUDUL_1] untuk Bab/Bagian Utama, [JUDUL_2] untuk Sub-bab, [JUDUL_3] untuk Sub-subbab, dan pastikan setiap paragraf baru memiliki indentasi 1x Tab."

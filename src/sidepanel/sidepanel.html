@@ -90,6 +90,7 @@
       <p id="welcome-desc">Ajak GTyipe bertukar pikiran, mengkritisi argumen dokumen, merancang kerangka bab, atau langsung mengetik draf otomatis ke Google Docs.</p>
 
       <div class="suggestions-grid">
+        <button class="suggestion-chip" data-prompt="Jalankan Dokter Dokumen: analisa kesehatan tipografi, PUEBI, dan kelengkapan struktur naskah ini serta berikan solusi perbaikannya">Dokter Dokumen: Diagnosa & Audit Naskah</button>
         <button class="suggestion-chip" data-prompt="Bantu susun kerangka dan ide pokok tulisan ini">Diskusikan kerangka dan ide tulisan</button>
         <button class="suggestion-chip" data-prompt="Review teks seleksi dan berikan kritik konstruktif">Review dan beri masukan teks aktif</button>
         <button class="suggestion-chip" data-prompt="Kritisi kelemahan logika atau argumen dalam bagian ini">Kritisi kelemahan argumen</button>
@@ -103,6 +104,31 @@
 
   <!-- Bottom Input Bar -->
   <footer class="input-container">
+    <!-- Dokter Dokumen Proactive Health Bar -->
+    <div id="doc-health-bar" class="doc-health-bar">
+      <div class="health-indicator-group">
+        <span class="health-badge-icon">🩺</span>
+        <span class="health-label">Dokter Dokumen:</span>
+        <span id="doc-health-score" class="health-score-val">100/100 • Prima</span>
+      </div>
+      <button type="button" id="btn-toggle-health-drawer" class="health-detail-btn" title="Lihat temuan audit & perbaikan cepat">Detail Audit</button>
+    </div>
+
+    <!-- Collapsible Health Drawer -->
+    <div id="doc-health-drawer" class="doc-health-drawer" style="display: none;">
+      <div class="health-drawer-header">
+        <span class="health-drawer-title">Hasil Diagnosa Dokter Dokumen</span>
+        <button type="button" id="btn-close-health-drawer" class="close-btn">&times;</button>
+      </div>
+      <div id="health-drawer-body" class="health-drawer-body">
+        <div class="health-audit-item"><span class="health-item-tag">Tipografi:</span> Memindai halaman...</div>
+      </div>
+      <div class="health-drawer-actions">
+        <button type="button" id="btn-health-calibrate" class="health-action-btn">⚡ Kalibrasi 12pt Justify</button>
+        <button type="button" id="btn-health-fix-puebi" class="health-action-btn">✍️ Perbaiki PUEBI</button>
+      </div>
+    </div>
+
     <div id="page-profile-bar" class="page-profile-bar">
       <div class="page-profile-info">
         <span class="page-profile-badge">Format Halaman:</span>

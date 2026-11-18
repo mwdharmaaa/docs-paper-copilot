@@ -178,6 +178,20 @@
       return false;
     }
 
+    if (request.action === "CALIBRATE_TYPOGRAPHY") {
+      if (window.AutoTyper && typeof window.AutoTyper.calibrateTo12 === "function") {
+        window.AutoTyper.calibrateTo12().then((size) => {
+          showDocsNotification("Tipografi berhasil dikalibrasi ke 12pt Justify.");
+          sendResponse({ success: true, size });
+        }).catch((err) => {
+          sendResponse({ success: false, error: String(err) });
+        });
+        return true;
+      }
+      sendResponse({ success: false, error: "AutoTyper tidak tersedia." });
+      return false;
+    }
+
     return false;
   });
 })();
